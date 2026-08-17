@@ -24,9 +24,10 @@ Turn your GitHub contribution graph into a living koi pond, seen from above.
 The original edition remains available at
 [0xydev.github.io/koipond](https://0xydev.github.io/koipond/).
 
-<a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803">
-  <img width="100%" alt="A living koi pond moving through four seasons and day and night" src="assets/demo-cycle.svg">
-</a>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.svg">
+  <img width="100%" alt="An animated koi pond generated from a GitHub contribution graph" src="assets/demo-light.svg">
+</picture>
 
 Your contributions become plankton: bigger and brighter the more you commit. Fish paths come from
 a deterministic steering-force simulation (momentum, capped turning force, a gentle wander), and
