@@ -158,6 +158,7 @@ describe('environment-aware original renderer', () => {
     expect(renders[1]).toContain('data-lotus-state="sleeping"')
     expect(renders[1]).toContain('data-lotus-openness="0.120"')
     expect(renders[1].match(/data-lotus-form="closed-bud"/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(renders[1].match(/data-lotus-view="top-down-folded"/g)?.length).toBeGreaterThanOrEqual(3)
     expect(renders[2]).toContain('data-seasonal-part="autumn-maple"')
     expect(renders[3]).toContain('data-seasonal-part="winter-ice"')
     expect(renders[3]).toContain('data-seasonal-part="winter-snowfall"')
@@ -219,7 +220,7 @@ describe('environment-aware original renderer', () => {
     expect(variable(firstLeaf(westSvg), 'mx0')).toBeGreaterThan(variable(firstLeaf(westSvg), 'mx3'))
   })
 
-  it('floats summer lotus flowers with the water current and calms them at night', () => {
+  it('floats summer lotus flowers with the water current by day and night', () => {
     const eastward = deriveEnvironment(momentFromText('2026-08-16', '12:00', 0, 0, 0), 'summer')
     const westward = deriveEnvironment(momentFromText('2026-08-22', '12:00', 0, 0, 0), 'summer')
     const night = deriveEnvironment(momentFromText('2026-08-16', '00:00', 0, 0, 0), 'summer')
@@ -236,7 +237,8 @@ describe('environment-aware original renderer', () => {
     expect(firstDrift(westSvg)).toContain('data-lotus-current="-1"')
     expect(variable(firstDrift(eastSvg), 'x0')).toBeLessThan(variable(firstDrift(eastSvg), 'x2'))
     expect(variable(firstDrift(westSvg), 'x0')).toBeGreaterThan(variable(firstDrift(westSvg), 'x2'))
-    expect(amplitude(firstDrift(eastSvg))).toBeGreaterThan(amplitude(firstDrift(nightSvg)) * 2)
+    expect(amplitude(firstDrift(eastSvg))).toBeGreaterThan(2)
+    expect(amplitude(firstDrift(nightSvg))).toBeGreaterThan(2)
   })
 
   it('bends spring water plants with the current and dims their bubbles at night', () => {

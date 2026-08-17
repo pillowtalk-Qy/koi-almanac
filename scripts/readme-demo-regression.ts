@@ -168,19 +168,48 @@ try {
   const nightLotus = await page.$eval(`.readme-demo-scene-${summerNightIndex}`, (scene, prefix) => {
     const sleeping = scene.querySelectorAll('[data-lotus-state="sleeping"][data-lotus-openness="0.120"]').length
     const buds = scene.querySelectorAll('[data-lotus-form="closed-bud"]').length
+    const topDownBuds = scene.querySelectorAll('[data-lotus-view="top-down-folded"]').length
     const openStage = scene.querySelector(`.${prefix}-lotus-open-stage`)
     const bud = scene.querySelector(`.${prefix}-summer-lotus-bud`)
     return {
       sleeping,
       buds,
+      topDownBuds,
       openOpacity: openStage ? Number(getComputedStyle(openStage).opacity) : 1,
       budOpacity: bud ? Number(getComputedStyle(bud).opacity) : 0,
     }
   }, `rd${summerNightIndex}`)
-  if (nightLotus.sleeping < 3 || nightLotus.buds < 3 || nightLotus.openOpacity > 0.02 || nightLotus.budOpacity < 0.75) {
+  if (
+    nightLotus.sleeping < 3 || nightLotus.buds < 3 || nightLotus.topDownBuds < 3 ||
+    nightLotus.openOpacity > 0.02 || nightLotus.budOpacity < 0.75
+  ) {
     throw new Error(`README summer night lotus is not closed: ${JSON.stringify(nightLotus)}`)
   }
-  const lotus = { ...lotusMotion, travel: lotusTravel, travelX: lotusTravelX, night: nightLotus }
+  const nightLotusSelector = `.readme-demo-scene-${summerNightIndex} .rd${summerNightIndex}-summer-lotus-drift[data-lotus-motion="current-drift"]`
+  const seekNightLotus = async (progress: number) => {
+    return await page.$eval(nightLotusSelector, (element, value) => {
+      const animation = element.getAnimations()[0]
+      if (!animation) throw new Error('README summer night lotus has no native animation')
+      const timing = animation.effect?.getTiming()
+      const duration = Number(timing?.duration)
+      const delay = Number(timing?.delay ?? 0)
+      let currentTime = delay + duration * value
+      while (currentTime < 0) currentTime += duration
+      animation.currentTime = currentTime
+      const rect = element.getBoundingClientRect()
+      return { centerX: rect.x + rect.width / 2, centerY: rect.y + rect.height / 2 }
+    }, progress)
+  }
+  const nightLotusStart = await seekNightLotus(0)
+  const nightLotusWithCurrent = await seekNightLotus(0.72)
+  const nightLotusTravel = Math.hypot(
+    nightLotusWithCurrent.centerX - nightLotusStart.centerX,
+    nightLotusWithCurrent.centerY - nightLotusStart.centerY,
+  )
+  if (nightLotusTravel <= 1.2 || nightLotusTravel >= 8) {
+    throw new Error(`README summer night lotus motion is invalid: ${nightLotusTravel.toFixed(2)}px`)
+  }
+  const lotus = { ...lotusMotion, travel: lotusTravel, travelX: lotusTravelX, night: nightLotus, nightTravel: nightLotusTravel }
 
   const transitionTime = (slotSeconds - README_DEMO_TRANSITION_SECONDS / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), transitionTime)

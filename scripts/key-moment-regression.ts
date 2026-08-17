@@ -224,6 +224,19 @@ try {
   report.lotus = { ...lotusMotion, travel: lotusTravel, travelX: lotusTravelX }
 
   await load(page, summerNight.svg)
+  const nightLotusSelector = '.summer-lotus-drift[data-lotus-motion="current-drift"]'
+  await setProgress(page, [nightLotusSelector], 0)
+  const nightLotusStart = await box(page, nightLotusSelector)
+  await setProgress(page, [nightLotusSelector], 0.72)
+  const nightLotusWithCurrent = await box(page, nightLotusSelector)
+  const nightLotusTravel = distance(nightLotusStart, nightLotusWithCurrent)
+  assert(
+    nightLotusTravel > 1.2 && nightLotusTravel < 8,
+    `Summer night lotus drift is ${nightLotusTravel.toFixed(2)}px instead of a visible low-amplitude float`,
+  )
+  await capture(page, 'summer-night-lotus-drift')
+  report.lotusNight = { travel: nightLotusTravel, start: nightLotusStart, end: nightLotusWithCurrent }
+
   const fireflyIndex = await page.$eval(
     '.firefly-flight[data-firefly-role="lotus-visitor"]',
     element => element.getAttribute('data-firefly-index'),

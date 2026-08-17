@@ -539,7 +539,7 @@ export function renderSVG(
 .bloom{transform-box:fill-box;transform-origin:center;animation:bloom 5.2s ease-in-out infinite alternate}
 .lotus-bud{transform-box:fill-box;transform-origin:center;animation:lotus-bud 4.8s ease-in-out infinite alternate}
 .summer-lotus-bud{transform-box:fill-box;transform-origin:center;animation:summer-lotus-bud 5.4s ease-in-out infinite alternate}
-.summer-lotus-drift{transform-box:fill-box;transform-origin:center;animation-name:summer-lotus-drift;animation-timing-function:cubic-bezier(.42,.08,.58,.92);animation-iteration-count:infinite}
+.summer-lotus-drift{transform-box:fill-box;transform-origin:center;will-change:transform;animation-name:summer-lotus-drift;animation-timing-function:cubic-bezier(.42,.08,.58,.92);animation-iteration-count:infinite}
 .spring-plant,.spring-blade{transform-box:fill-box;transform-origin:center bottom;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-direction:alternate}
 .spring-plant{animation-name:spring-plant}
 .spring-blade{animation-name:spring-blade}
