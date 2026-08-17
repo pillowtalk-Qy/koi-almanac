@@ -4,16 +4,13 @@ import { plan } from './planner'
 import { themeForEnvironment } from './render/palette'
 import { renderSVG } from './render/svg'
 
-export const SHOWCASE_LOOP_SECONDS = 32
+export const SHOWCASE_LOOP_SECONDS = 14
+export const SHOWCASE_TRANSITION_SECONDS = 1.2
 
 const scenes: Array<{ season: PondSeason; phase: 'day' | 'night'; date: string; time: string }> = [
   { season: 'spring', phase: 'day', date: '2026-04-16', time: '12:00' },
-  { season: 'spring', phase: 'night', date: '2026-04-16', time: '00:00' },
-  { season: 'summer', phase: 'day', date: '2026-08-16', time: '12:00' },
   { season: 'summer', phase: 'night', date: '2026-08-16', time: '00:00' },
   { season: 'autumn', phase: 'day', date: '2026-10-16', time: '12:00' },
-  { season: 'autumn', phase: 'night', date: '2026-10-16', time: '00:00' },
-  { season: 'winter', phase: 'day', date: '2026-01-15', time: '12:00' },
   { season: 'winter', phase: 'night', date: '2026-01-15', time: '00:00' },
 ]
 
@@ -21,7 +18,7 @@ const percent = (value: number) => `${Number(value.toFixed(3))}%`
 
 function sceneKeyframes(index: number): string {
   const slot = 100 / scenes.length
-  const fade = 1.4
+  const fade = SHOWCASE_TRANSITION_SECONDS / SHOWCASE_LOOP_SECONDS * 100
   const start = index * slot
   const end = (index + 1) * slot
   const name = `showcase-scene-${index}`
@@ -60,7 +57,8 @@ export function renderReadmeShowcase(seed = 'koi-almanac-showcase'): string {
     `<desc id="showcase-desc">A living contribution pond moving through spring, summer, autumn, ` +
     `winter, daylight and night.</desc>` +
     `<style>.showcase-scene{opacity:0;animation-duration:${SHOWCASE_LOOP_SECONDS}s;` +
-    `animation-timing-function:linear;animation-iteration-count:infinite}${classes}${keyframes}` +
+    `animation-timing-function:cubic-bezier(0.45,0,0.55,1);animation-iteration-count:infinite}` +
+    `${classes}${keyframes}` +
     `@media (prefers-reduced-motion:reduce){.showcase-scene{animation:none;opacity:0}` +
     `.showcase-scene-0{opacity:1}}</style>${images}</svg>`
 }

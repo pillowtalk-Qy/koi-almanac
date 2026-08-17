@@ -3,7 +3,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
 import sharp from 'sharp'
-import { renderReadmeShowcase, SHOWCASE_LOOP_SECONDS, showcaseScenes } from '../src/showcase'
+import {
+  renderReadmeShowcase,
+  SHOWCASE_LOOP_SECONDS,
+  SHOWCASE_TRANSITION_SECONDS,
+  showcaseScenes,
+} from '../src/showcase'
 import { findBrowser } from '../src/video'
 
 const outputArgument = process.argv.find(argument => argument.startsWith('--out='))
@@ -85,7 +90,21 @@ try {
 
   if (digests.size !== scenes.length) throw new Error('One or more showcase scenes rendered identically')
 
-  const motionTime = (3 * slotSeconds + slotSeconds / 2) * 1000
+  const transitionTime = (slotSeconds - SHOWCASE_TRANSITION_SECONDS / 2) * 1000
+  await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), transitionTime)
+  const transitionOpacities = await page.$$eval('.showcase-scene', elements =>
+    elements.map(element => Number(getComputedStyle(element).opacity)),
+  )
+  const transitionSum = transitionOpacities[0] + transitionOpacities[1]
+  if (
+    transitionOpacities[0] < 0.35 || transitionOpacities[0] > 0.65 ||
+    transitionOpacities[1] < 0.35 || transitionOpacities[1] > 0.65 ||
+    Math.abs(transitionSum - 1) > 0.08 || transitionOpacities.slice(2).some(opacity => opacity > 0.01)
+  ) {
+    throw new Error(`Showcase crossfade is not balanced: ${transitionOpacities.join(', ')}`)
+  }
+
+  const motionTime = (slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), motionTime)
   const before = await page.screenshot({ type: 'png', omitBackground: true }) as Buffer
   await delay(500)
@@ -93,8 +112,14 @@ try {
   const motionDelta = await meanDelta(before, after)
   if (motionDelta < 0.08) throw new Error(`Embedded pond animation appears frozen: mean delta ${motionDelta}`)
 
-  writeFileSync(join(outputDirectory, 'report.json'), JSON.stringify({ scenes: report, motionDelta }, null, 2) + '\n')
-  console.log(`${scenes.length} living scenes verified across a ${SHOWCASE_LOOP_SECONDS}s loop; motion delta ${motionDelta.toFixed(3)}`)
+  writeFileSync(
+    join(outputDirectory, 'report.json'),
+    JSON.stringify({ scenes: report, transitionOpacities, motionDelta }, null, 2) + '\n',
+  )
+  console.log(
+    `${scenes.length} living scenes verified across a ${SHOWCASE_LOOP_SECONDS}s loop; ` +
+    `balanced ${SHOWCASE_TRANSITION_SECONDS}s crossfade; motion delta ${motionDelta.toFixed(3)}`,
+  )
 } finally {
   await browser.close()
 }
