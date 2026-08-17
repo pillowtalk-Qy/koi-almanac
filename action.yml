@@ -1,0 +1,56 @@
+name: "Koi Almanac"
+description: "Generate a persistent, season-aware contribution pond with verifiable state"
+branding:
+  icon: "droplet"
+  color: "blue"
+
+inputs:
+  github_user_name:
+    description: "GitHub user whose contribution graph feeds the pond"
+    required: true
+  outputs:
+    description: >
+      Files to generate, one per line. Each line can be customized with a query
+      string. Supported options: theme=light|dark, seed=<any string>,
+      environment=auto, date=YYYY-MM-DD, time=HH:MM, timezone=<UTC minutes>,
+      latitude=<degrees>, longitude=<degrees>, season=spring|summer|autumn|winter
+    required: false
+    default: |
+      dist/koi-almanac-light.svg
+      dist/koi-almanac-dark.svg?theme=dark
+  github_token:
+    description: "Token used to read the contribution calendar (falls back to public data when empty)"
+    required: false
+    default: ${{ github.token }}
+  state_file:
+    description: "Local state artifact. Publish it with the SVGs to preserve fish identity and growth"
+    required: false
+    default: "dist/pond-state.json"
+  state_branch:
+    description: "Branch that contains the previously published state artifact"
+    required: false
+    default: "output"
+  state_path:
+    description: "Path to the state artifact inside the published branch"
+    required: false
+    default: "pond-state.json"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 22
+    - run: npm ci --omit=dev --prefix "$GITHUB_ACTION_PATH"
+      shell: bash
+    - run: '"$GITHUB_ACTION_PATH/node_modules/.bin/tsx" "$GITHUB_ACTION_PATH/src/action.ts"'
+      shell: bash
+      env:
+        KOIPOND_USER: ${{ inputs.github_user_name }}
+        KOIPOND_TOKEN: ${{ inputs.github_token }}
+        KOIPOND_OUTPUTS: ${{ inputs.outputs }}
+        KOIPOND_STATE_FILE: ${{ inputs.state_file }}
+        KOIPOND_STATE_BRANCH: ${{ inputs.state_branch }}
+        KOIPOND_STATE_PATH: ${{ inputs.state_path }}
+        KOIPOND_GENERATOR_REPOSITORY: ${{ github.action_repository }}
+        KOIPOND_GENERATOR_SHA: ${{ github.action_ref }}

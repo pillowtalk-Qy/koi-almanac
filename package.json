@@ -1,0 +1,59 @@
+{
+  "name": "koi-almanac",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A persistent, season-aware GitHub contribution pond with independently verifiable state.",
+  "license": "MIT",
+  "author": "pillowtalk-Qy",
+  "contributors": [
+    "0xydev (original project creator)"
+  ],
+  "repository": "github:pillowtalk-Qy/koi-almanac",
+  "homepage": "https://pillowtalk-qy.github.io/koi-almanac/",
+  "keywords": [
+    "github",
+    "contribution-graph",
+    "koi",
+    "svg",
+    "animation",
+    "profile-readme"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "tsx src/cli.ts --demo --theme both --out dist",
+    "gen": "tsx src/cli.ts",
+    "verify:state": "tsx src/verify.ts",
+    "verify:motion": "node --import tsx scripts/motion-regression.ts --metrics-only",
+    "verify:key-moments": "node --import tsx scripts/key-moment-regression.ts",
+    "monitor:production": "node --import tsx scripts/synthetic-monitor.ts",
+    "capture:motion": "node --import tsx scripts/motion-regression.ts",
+    "visual:check": "node --import tsx scripts/visual-regression.ts",
+    "visual:update": "node --import tsx scripts/visual-regression.ts --update",
+    "release:check": "node --import tsx scripts/release.ts --check",
+    "release:sync": "node --import tsx scripts/release.ts --sync",
+    "build:site": "esbuild src/web/main.ts --bundle --minify --format=iife --outfile=site/demo.js",
+    "cf:types": "wrangler types worker-configuration.d.ts",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.3.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "sharp": "0.35.2",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.123.0"
+  }
+}

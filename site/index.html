@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koi Almanac: a living, seasonal GitHub contribution pond</title>
+<meta name="description" content="Type a GitHub username and watch its contribution graph become an animated koi pond.">
+<style>
+  :root {
+    --bg: #051019;
+    --surface: rgba(13, 33, 47, 0.6);
+    --surface-solid: #0c2231;
+    --ink: #e3f4fb;
+    --muted: #82a9bc;
+    --accent: #22d3ee;
+    --accent-2: #34d399;
+    --border: rgba(125, 211, 252, 0.14);
+    --glow: rgba(34, 211, 238, 0.35);
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 72px 20px 80px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ambient light blobs drifting behind everything */
+  .aurora { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+  .aurora i {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.5;
+    animation: drift 26s ease-in-out infinite alternate;
+  }
+  .aurora i:nth-child(1) { width: 46vw; height: 46vw; left: -12vw; top: -18vw; background: radial-gradient(circle, rgba(34,211,238,0.28), transparent 65%); }
+  .aurora i:nth-child(2) { width: 38vw; height: 38vw; right: -10vw; top: 8vh; background: radial-gradient(circle, rgba(52,211,153,0.18), transparent 65%); animation-delay: -9s; animation-duration: 32s; }
+  .aurora i:nth-child(3) { width: 42vw; height: 42vw; left: 22vw; bottom: -24vw; background: radial-gradient(circle, rgba(56,130,246,0.2), transparent 65%); animation-delay: -17s; animation-duration: 38s; }
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(6vw, 4vh) scale(1.12); }
+  }
+
+  main { max-width: 920px; margin: 0 auto; display: grid; gap: 26px; }
+
+  header { display: grid; gap: 14px; justify-items: start; }
+  .badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    background: rgba(34, 211, 238, 0.07);
+    padding: 5px 13px;
+    border-radius: 999px;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(38px, 6vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+  h1 .koi { filter: drop-shadow(0 6px 18px var(--glow)); }
+  h1 span {
+    background: linear-gradient(100deg, #7ff3ff 0%, var(--accent) 45%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; font-size: 16.5px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  form { display: flex; gap: 12px; flex-wrap: wrap; }
+  #user {
+    flex: 1;
+    min-width: 230px;
+    background: rgba(4, 14, 22, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 15.5px;
+    padding: 13px 16px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  #user::placeholder { color: rgba(130, 169, 188, 0.6); }
+  #user:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.22), 0 0 24px rgba(34, 211, 238, 0.12);
+  }
+  button {
+    background: linear-gradient(135deg, #67e8f9, var(--accent));
+    border: 0;
+    border-radius: 13px;
+    color: #04222c;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    padding: 13px 26px;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    box-shadow: 0 6px 22px rgba(34, 211, 238, 0.25);
+  }
+  button:hover:not(:disabled) { transform: translateY(-1.5px); box-shadow: 0 10px 28px rgba(34, 211, 238, 0.38); }
+  button:active:not(:disabled) { transform: translateY(0); }
+  button:disabled { opacity: 0.55; cursor: wait; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .chip {
+    background: rgba(34, 211, 238, 0.08);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 5px 13px;
+    border-radius: 999px;
+    box-shadow: none;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  }
+  .chip:hover:not(:disabled) { background: rgba(34, 211, 238, 0.16); border-color: rgba(34, 211, 238, 0.45); transform: translateY(-1px); box-shadow: none; }
+
+  #status { margin: 10px 0 0; min-height: 1.4em; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  #status:not(:empty)::before { content: "≈ "; color: var(--accent); }
+
+  #result { display: grid; gap: 16px; animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+  #result[hidden] { display: none; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  #tabs { display: flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px; width: max-content; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  #tabs button {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 18px;
+    border-radius: 999px;
+    box-shadow: none;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  #tabs button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
+  #tabs button.on { background: linear-gradient(135deg, #67e8f9, var(--accent)); color: #04222c; }
+  #download {
+    margin-left: auto;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 16px;
+    background: var(--surface);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: border-color 0.16s ease, background 0.16s ease;
+  }
+  #download:hover { border-color: rgba(34, 211, 238, 0.5); background: rgba(34, 211, 238, 0.1); }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toolbar #tabs { margin: 0; }
+  #environment-controls {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    flex-wrap: wrap;
+    min-height: 36px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .env-field, .live-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .env-field input {
+    width: auto;
+    color-scheme: dark;
+    background: rgba(4, 14, 22, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink);
+    font: inherit;
+    padding: 6px 8px;
+  }
+  .live-toggle { color: var(--accent); cursor: pointer; }
+  .live-toggle input { accent-color: var(--accent); }
+  #moment-label { margin-left: auto; color: var(--muted); }
+  #season-jumps {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .season-jump {
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    box-shadow: none;
+    color: var(--muted);
+    font: inherit;
+    padding: 4px 9px;
+  }
+  .season-jump:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
+  .season-jump.on, .phase-jump.on { background: rgba(34, 211, 238, 0.14); color: var(--accent); }
+  #phase-jumps {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .phase-jump {
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    box-shadow: none;
+    color: var(--muted);
+    font: 14px/1 var(--sans);
+  }
+  .phase-jump:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
+  .fixed-environment #environment-controls { opacity: 0.42; pointer-events: none; }
+
+  #pond {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    overflow-x: auto;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 60px rgba(34, 211, 238, 0.05) inset;
+  }
+  #pond svg {
+    width: 100%;
+    min-width: 640px;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    transform-origin: center;
+    transition: opacity 210ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #pond.pond-leaving svg { opacity: 0; transform: scale(0.994); }
+  #pond.pond-entering svg { opacity: 0; transform: scale(1.006); }
+
+  #install { display: grid; gap: 14px; }
+  #install h2 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+  #install h2::before { content: "🚀 "; }
+  #install p { margin: 0; color: var(--muted); font-size: 14.5px; max-width: 66ch; }
+  .step { display: flex; gap: 14px; align-items: flex-start; }
+  .step > div { flex: 1; display: grid; gap: 13px; justify-items: start; min-width: 0; }
+  .step .n {
+    flex: none;
+    width: 26px; height: 26px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: rgba(34, 211, 238, 0.12);
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+  .btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #67e8f9, var(--accent));
+    border-radius: 12px;
+    color: #04222c;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 20px;
+    text-decoration: none;
+    box-shadow: 0 6px 22px rgba(34, 211, 238, 0.25);
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+  }
+  .btn:hover { transform: translateY(-1.5px); box-shadow: 0 10px 28px rgba(34, 211, 238, 0.38); }
+  #install-note { margin-left: 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .step pre { width: 100%; }
+  pre {
+    margin: 0;
+    background: rgba(3, 10, 17, 0.8);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+  pre code { font-family: var(--mono); font-size: 12.5px; color: #a8e6f5; background: none; padding: 0; }
+  #copy { padding: 8px 16px; font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; margin-left: 10px; }
+  .hint a { color: var(--accent); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+    color: var(--muted);
+    font-size: 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); background: rgba(34, 211, 238, 0.09); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; font-size: 12.5px; }
+
+  @media (max-width: 560px) {
+    body { padding: 48px 14px 60px; }
+    .card { padding: 16px; }
+    #download { margin-left: 0; }
+    #moment-label { width: 100%; margin-left: 0; }
+    #pond { padding: 8px; overflow: hidden; }
+    #pond svg { min-width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aurora i, #result { animation: none; }
+    #pond svg { transition: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<main>
+  <header>
+    <span class="badge">Independent Qy project · derived from 0xydev/koipond</span>
+    <h1><span class="koi">🎏</span> <span>Koi Almanac</span></h1>
+    <p class="lede">Your GitHub contribution graph as a <b>living koi pond</b>. Commits become plankton,
+    fish graze the year clean, a turtle joins for 30+ day streaks and a lotus blooms over quiet
+    stretches. The pond follows Hong Kong daylight and the four seasons. Type a username and watch.</p>
+  </header>
+
+  <section class="card">
+    <form id="form">
+      <input id="user" placeholder="github username" autocomplete="off" spellcheck="false" aria-label="GitHub username">
+      <button id="go" type="submit">Generate</button>
+    </form>
+    <div class="chips">
+      try:
+      <button type="button" class="chip" data-user="torvalds">torvalds</button>
+      <button type="button" class="chip" data-user="sindresorhus">sindresorhus</button>
+      <button type="button" class="chip" data-user="yyx990803">yyx990803</button>
+    </div>
+    <p id="status" aria-live="polite"></p>
+  </section>
+
+  <div id="result" hidden>
+    <div class="toolbar">
+      <div id="tabs">
+        <button type="button" data-theme="auto">auto</button>
+        <button type="button" data-theme="light">light</button>
+        <button type="button" data-theme="dark">dark</button>
+      </div>
+      <a id="download" href="#">↓ download svg</a>
+    </div>
+    <div id="environment-controls" aria-label="Pond time controls">
+      <label class="live-toggle"><input id="live" type="checkbox" checked> live</label>
+      <label class="env-field">date <input id="date" type="date"></label>
+      <label class="env-field">time <input id="time" type="time"></label>
+      <div id="season-jumps" aria-label="Season previews">
+        <button type="button" class="season-jump" data-season="spring" data-month-day="04-15">spring</button>
+        <button type="button" class="season-jump" data-season="summer" data-month-day="07-15">summer</button>
+        <button type="button" class="season-jump" data-season="autumn" data-month-day="10-15">autumn</button>
+        <button type="button" class="season-jump" data-season="winter" data-month-day="01-15">winter</button>
+      </div>
+      <div id="phase-jumps" aria-label="Day and night previews">
+        <button type="button" class="phase-jump" data-phase="day" data-time="12:00" title="Preview daytime" aria-label="Preview daytime">☀</button>
+        <button type="button" class="phase-jump" data-phase="night" data-time="23:00" title="Preview nighttime" aria-label="Preview nighttime">☾</button>
+      </div>
+      <span id="moment-label" aria-live="polite"></span>
+    </div>
+    <div id="pond"></div>
+
+    <section id="install" class="card">
+      <h2>Add it to your profile</h2>
+      <div class="step">
+        <span class="n">1</span>
+        <div>
+          <p>One click creates the workflow file in your profile repo, prefilled. Commit it, run it
+          once from the Actions tab, done: the pond refreshes itself every hour.</p>
+          <p><a id="install-link" class="btn" target="_blank" rel="noopener">Create workflow</a>
+          <span id="install-note"></span></p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <div>
+          <p>Then paste this into your profile README:</p>
+          <pre><code id="snippet"></code></pre>
+          <p><button type="button" id="copy">Copy snippet</button>
+          <span class="hint">No profile repo yet? <a id="repo-link" target="_blank" rel="noopener">Create it first</a>
+          (a public repo named exactly after your username).</span></p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span>Derived from the original project and visual concept by <a href="https://github.com/0xydev">0xydev</a>.</span>
+    <span>·</span>
+    <span>Koi Almanac maintained by <a href="https://github.com/pillowtalk-Qy">Qy</a>.</span>
+    <span>·</span>
+    <a href="https://github.com/pillowtalk-Qy/koi-almanac#usage-github-action">source and setup</a>
+    <span>·</span>
+    <a href="https://github.com/pillowtalk-Qy/koi-almanac/blob/main/NOTICE.md">lineage</a>
+    <span>· MIT</span>
+  </footer>
+</main>
+<script src="demo.js" defer></script>
+</body>
+</html>
