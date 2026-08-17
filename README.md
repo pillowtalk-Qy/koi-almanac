@@ -121,7 +121,7 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: pillowtalk-Qy/koi-almanac@94889cb408c2c86272702ca98404f8ed8951ebc5
+      - uses: pillowtalk-Qy/koi-almanac@e87abde44224bc375b8a62ca5791865ab98c78d0
         with:
           github_user_name: ${{ github.repository_owner }}
           outputs: |
