@@ -18,8 +18,9 @@
 
 Turn your GitHub contribution graph into a living koi pond, seen from above.
 
-**Try Koi Almanac with any public username:
-[pillowtalk-Qy.github.io/koi-almanac](https://pillowtalk-qy.github.io/koi-almanac/)**
+**The pond below is a 24-second accelerated tour of the living year. To see your own Koi Almanac
+generated from your real GitHub contribution history, current date, time and season, use the
+[live explorer](https://pillowtalk-qy.github.io/koi-almanac/).**
 
 The original edition remains available at
 [0xydev.github.io/koipond](https://0xydev.github.io/koipond/).

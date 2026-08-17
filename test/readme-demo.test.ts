@@ -7,6 +7,8 @@ describe('README pond demo', () => {
     const svg = readFileSync('assets/demo-almanac.svg', 'utf8')
 
     expect(readme).toContain('src="assets/demo-almanac.svg"')
+    expect(readme).toContain('24-second accelerated tour')
+    expect(readme).toContain('https://pillowtalk-qy.github.io/koi-almanac/')
     expect(readme).not.toContain('demo-cycle.svg')
     expect(svg).toMatch(/^<svg /)
     expect(svg.match(/data-readme-season=/g)).toHaveLength(8)
