@@ -20,6 +20,7 @@ import {
   moonWaterLight,
   motes,
   pebbles,
+  springWaterPlants,
   summerFireflies,
   summerBlooms,
   surfaceSheen,
@@ -539,6 +540,10 @@ export function renderSVG(
 .lotus-bud{transform-box:fill-box;transform-origin:center;animation:lotus-bud 4.8s ease-in-out infinite alternate}
 .summer-lotus-bud{transform-box:fill-box;transform-origin:center;animation:summer-lotus-bud 5.4s ease-in-out infinite alternate}
 .summer-lotus-drift{transform-box:fill-box;transform-origin:center;animation-name:summer-lotus-drift;animation-timing-function:cubic-bezier(.42,.08,.58,.92);animation-iteration-count:infinite}
+.spring-plant,.spring-blade{transform-box:fill-box;transform-origin:center bottom;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-direction:alternate}
+.spring-plant{animation-name:spring-plant}
+.spring-blade{animation-name:spring-blade}
+.spring-bubble{transform-box:fill-box;transform-origin:center;opacity:0;animation-name:spring-bubble;animation-timing-function:linear;animation-iteration-count:infinite}
 .firefly-flight{animation-name:firefly-flight;animation-timing-function:linear;animation-iteration-count:infinite}
 .firefly-glow{transform-box:fill-box;transform-origin:center;animation-name:firefly-glow;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 .lotus-visit{transform-box:fill-box;transform-origin:center;animation-name:lotus-visit;animation-timing-function:ease-out;animation-iteration-count:infinite}
@@ -570,6 +575,9 @@ export function renderSVG(
 @keyframes lotus-bud{from{transform:translateY(0) rotate(-2deg)}to{transform:translateY(-0.5px) rotate(2deg)}}
 @keyframes summer-lotus-bud{from{transform:scale(0.99)}to{transform:scale(1.01)}}
 @keyframes summer-lotus-drift{0%,100%{transform:translate(var(--lotus-x0),var(--lotus-y0)) rotate(var(--lotus-r0))}43%{transform:translate(var(--lotus-x1),var(--lotus-y1)) rotate(var(--lotus-r1))}72%{transform:translate(var(--lotus-x2),var(--lotus-y2)) rotate(var(--lotus-r2))}}
+@keyframes spring-plant{from{transform:rotate(var(--plant-r0))}to{transform:rotate(var(--plant-r1))}}
+@keyframes spring-blade{from{transform:rotate(var(--blade-r0))}to{transform:rotate(var(--blade-r1))}}
+@keyframes spring-bubble{0%,10%{transform:translate(0,0) scale(0.55);opacity:0}18%{opacity:0.48}78%{opacity:0.34}100%{transform:translate(var(--bubble-x),var(--bubble-y)) scale(1.08);opacity:0}}
 @keyframes firefly-flight{0%,100%{transform:translate(0,0)}29%{transform:translate(var(--ffx1),var(--ffy1))}64%{transform:translate(var(--ffx2),var(--ffy2))}82%{transform:translate(var(--ffx3),var(--ffy3))}}
 @keyframes firefly-glow{0%,100%{transform:scale(0.76);opacity:0.34}28%{transform:scale(1.06);opacity:1}52%{transform:scale(0.82);opacity:0.4}76%{transform:scale(1);opacity:0.9}}
 @keyframes lotus-visit{0%,54%,100%{transform:scale(0.35);opacity:0}62%{transform:scale(0.72);opacity:0.32}76%{transform:scale(1.45);opacity:0}}
@@ -668,6 +676,16 @@ ${turtleScene.css}
     deepShade(width, theme) +
     caustics(width, theme) +
     godRays(width, theme, r, environment?.sunDirection) +
+    springWaterPlants(
+      width,
+      theme,
+      seed,
+      environment?.seasonWeights.spring ?? 0,
+      currentDirection,
+      currentStrength,
+      environment?.surfaceActivity ?? 1,
+      environment?.daylight ?? 1,
+    ) +
     `<g>${planktonEls}</g>` +
     `<g>${rippleEls}</g>` +
     pebbles(theme, r) +

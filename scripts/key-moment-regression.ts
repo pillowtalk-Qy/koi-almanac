@@ -117,6 +117,15 @@ async function capture(page: Page, name: string) {
 rmSync(outputDirectory, { recursive: true, force: true })
 mkdirSync(outputDirectory, { recursive: true })
 
+const springEnvironment = deriveEnvironment(momentFromText('2026-04-16', '12:00'), 'spring')
+const springPlan = plan(grid, 'key-moment-regression', undefined, springEnvironment)
+const spring = renderSVG(
+  grid,
+  springPlan,
+  themeForEnvironment(springEnvironment),
+  'key-moment-regression',
+  { environment: springEnvironment },
+)
 const summerDayEnvironment = deriveEnvironment(momentFromText('2026-08-16', '12:00'), 'summer')
 const summerDayPlan = plan(grid, 'key-moment-regression', undefined, summerDayEnvironment)
 const summerDay = renderSVG(
@@ -154,6 +163,47 @@ const browser = await puppeteer.launch({
 
 try {
   const page = await browser.newPage()
+
+  await load(page, spring.svg)
+  const springPlantSelector = '.spring-plant[data-plant-current]'
+  const springBubbleSelector = '.spring-bubble[data-spring-bubble="0"]'
+  const springMotion = await page.$eval(springPlantSelector, element => ({
+    direction: Number(element.getAttribute('data-plant-current')),
+    clusters: document.querySelectorAll('.spring-plant').length,
+    bubbles: document.querySelectorAll('.spring-bubble').length,
+  }))
+  await setProgress(page, [springPlantSelector], 0.2)
+  const springPlantStart = await box(page, springPlantSelector)
+  const springPlantStartState = await animationState(page, springPlantSelector)
+  await setProgress(page, [springPlantSelector], 0.8)
+  const springPlantWithCurrent = await box(page, springPlantSelector)
+  const springPlantCurrentState = await animationState(page, springPlantSelector)
+  const springPlantTravel = distance(springPlantStart, springPlantWithCurrent)
+  const springPlantTravelX = springPlantWithCurrent.centerX - springPlantStart.centerX
+  await setProgress(page, [springBubbleSelector], 0.18)
+  const springBubbleStart = await box(page, springBubbleSelector)
+  await setProgress(page, [springBubbleSelector], 0.78)
+  const springBubbleRisen = await box(page, springBubbleSelector)
+  const springBubbleRise = springBubbleStart.centerY - springBubbleRisen.centerY
+  assert(finiteBox(springPlantStart) && finiteBox(springPlantWithCurrent), 'Spring plant sway boxes are invalid')
+  assert(
+    springPlantTravel > 0.35 && springPlantTravel < 5,
+    `Spring plant sway is ${springPlantTravel.toFixed(2)}px instead of a restrained current response: ` +
+      JSON.stringify({ springPlantStart, springPlantWithCurrent, springPlantStartState, springPlantCurrentState }),
+  )
+  assert(Math.abs(springPlantTravelX) > 0.25, 'Spring plant sway no longer produces visible lateral motion')
+  assert(finiteBox(springBubbleStart) && finiteBox(springBubbleRisen), 'Spring bubble rise boxes are invalid')
+  assert(springBubbleRise > 12, `Spring oxygen bubble only rose ${springBubbleRise.toFixed(2)}px`)
+  assert(springMotion.clusters === 3 && springMotion.bubbles === 6, 'Spring growth population changed unexpectedly')
+  await capture(page, 'spring-growth-and-breathing')
+  report.spring = {
+    ...springMotion,
+    plantTravel: springPlantTravel,
+    plantTravelX: springPlantTravelX,
+    startState: springPlantStartState,
+    currentState: springPlantCurrentState,
+    bubbleRise: springBubbleRise,
+  }
 
   await load(page, summerDay.svg)
   const lotusSelector = '.summer-lotus-drift[data-lotus-motion="current-drift"]'
@@ -291,4 +341,4 @@ try {
 }
 
 writeFileSync(join(outputDirectory, 'report.json'), JSON.stringify(report, null, 2) + '\n')
-console.log(`${outputDirectory}/report.json  lotus, firefly, snow, turtle and fish seam key moments verified`)
+console.log(`${outputDirectory}/report.json  spring growth, lotus, firefly, snow, turtle and fish seam key moments verified`)

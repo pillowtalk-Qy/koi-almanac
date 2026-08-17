@@ -37,7 +37,7 @@ describe('environment-aware original renderer', () => {
     expect(meta.duration).toBeGreaterThan(pondPlan.duration)
   })
 
-  it('uses physical seasonal markers while spring keeps the original pond', () => {
+  it('uses physical seasonal markers while preserving the original pond language', () => {
     const spring = deriveEnvironment(momentFromText('2026-04-15', '12:00'), 'spring')
     const summer = deriveEnvironment(momentFromText('2026-07-15', '12:00'), 'summer')
     const autumn = deriveEnvironment(momentFromText('2026-10-15', '12:00'), 'autumn')
@@ -48,8 +48,14 @@ describe('environment-aware original renderer', () => {
     const winterSvg = renderSVG(grid, pondPlan, themeForEnvironment(winter), 'seasonal-render', { environment: winter }).svg
     expect(springSvg).not.toBe(autumnSvg)
     expect(springSvg.match(/data-pond-part="lily-pad"/g)).toHaveLength(4)
-    expect(springSvg).not.toContain('data-seasonal-part=')
+    expect(springSvg).toContain('data-seasonal-part="spring-growth"')
+    expect(springSvg.match(/class="spring-plant"/g)).toHaveLength(3)
+    expect(springSvg.match(/class="spring-blade"/g)?.length).toBeGreaterThanOrEqual(15)
+    expect(springSvg.match(/class="spring-bubble"/g)).toHaveLength(6)
+    expect(springSvg).toContain('@keyframes spring-plant{')
+    expect(springSvg).toContain('@keyframes spring-bubble{')
     expect(summerSvg).toContain('data-seasonal-part="summer-bloom"')
+    expect(summerSvg).not.toContain('data-seasonal-part="spring-growth"')
     expect(summerSvg).toContain('data-lotus-state="open"')
     expect(summerSvg.match(/data-lotus-openness=/g)?.length).toBeGreaterThanOrEqual(3)
     expect(summerSvg.match(/data-lotus-motion="current-drift"/g)?.length).toBeGreaterThanOrEqual(3)
@@ -139,7 +145,9 @@ describe('environment-aware original renderer', () => {
     })
 
     expect(new Set(renders).size).toBe(4)
-    expect(renders[0]).not.toContain('data-seasonal-part=')
+    expect(renders[0]).toContain('data-seasonal-part="spring-growth"')
+    expect(renders[0].match(/class="spring-plant"/g)).toHaveLength(3)
+    expect(renders[0].match(/class="spring-bubble"/g)).toHaveLength(6)
     expect(renders[1]).toContain('data-seasonal-part="summer-bloom"')
     expect(renders[1]).toContain('data-seasonal-part="summer-fireflies"')
     expect(renders[1].match(/class="firefly-flight"/g)?.length).toBeGreaterThanOrEqual(10)
@@ -229,6 +237,25 @@ describe('environment-aware original renderer', () => {
     expect(variable(firstDrift(eastSvg), 'x0')).toBeLessThan(variable(firstDrift(eastSvg), 'x2'))
     expect(variable(firstDrift(westSvg), 'x0')).toBeGreaterThan(variable(firstDrift(westSvg), 'x2'))
     expect(amplitude(firstDrift(eastSvg))).toBeGreaterThan(amplitude(firstDrift(nightSvg)) * 2)
+  })
+
+  it('bends spring water plants with the current and dims their bubbles at night', () => {
+    const eastward = deriveEnvironment(momentFromText('2026-08-16', '12:00', 0, 0, 0), 'spring')
+    const westward = deriveEnvironment(momentFromText('2026-08-22', '12:00', 0, 0, 0), 'spring')
+    const night = deriveEnvironment(momentFromText('2026-08-16', '00:00', 0, 0, 0), 'spring')
+    const eastSvg = renderSVG(grid, pondPlan, themeForEnvironment(eastward), 'seasonal-render', { environment: eastward }).svg
+    const westSvg = renderSVG(grid, pondPlan, themeForEnvironment(westward), 'seasonal-render', { environment: westward }).svg
+    const nightSvg = renderSVG(grid, pondPlan, themeForEnvironment(night), 'seasonal-render', { environment: night }).svg
+    const firstPlant = (svg: string) => svg.match(/class="spring-plant"[^>]+/)?.[0] ?? ''
+    const angle = (attributes: string, name: string) => Number(attributes.match(new RegExp(`--plant-${name}:([-\\d.]+)deg`))?.[1])
+    const bubbleOpacity = (svg: string) => Number(svg.match(/data-spring-part="oxygen-bubbles" opacity="([\d.]+)"/)?.[1])
+    const bias = (attributes: string) => (angle(attributes, 'r0') + angle(attributes, 'r1')) / 2
+
+    expect(firstPlant(eastSvg)).toContain('data-plant-current="1"')
+    expect(firstPlant(westSvg)).toContain('data-plant-current="-1"')
+    expect(bias(firstPlant(eastSvg))).toBeGreaterThan(0)
+    expect(bias(firstPlant(westSvg))).toBeLessThan(0)
+    expect(bubbleOpacity(eastSvg)).toBeGreaterThan(bubbleOpacity(nightSvg))
   })
 
   it('starts complete fish bodies and keeps the loop seam closed by day and night', () => {

@@ -78,6 +78,59 @@ try {
 
   if (digests.size !== scenes.length) throw new Error('One or more README environments rendered identically')
 
+  const springDayIndex = scenes.findIndex(scene => scene.season === 'spring' && scene.phase === 'day')
+  const springNightIndex = scenes.findIndex(scene => scene.season === 'spring' && scene.phase === 'night')
+  const springDayTime = (springDayIndex * slotSeconds + slotSeconds / 2) * 1000
+  await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), springDayTime)
+  const springPlantSelector = `.readme-demo-scene-${springDayIndex} .rd${springDayIndex}-spring-plant`
+  const springBubbleSelector = `.readme-demo-scene-${springDayIndex} .rd${springDayIndex}-spring-bubble`
+  const springPopulation = await page.$eval(`.readme-demo-scene-${springDayIndex}`, scene => ({
+    clusters: scene.querySelectorAll('[data-spring-cluster]').length,
+    bubbles: scene.querySelectorAll('[data-spring-bubble]').length,
+  }))
+  const seekSpring = async (selector: string, progress: number) => {
+    return await page.$eval(selector, (element, value) => {
+      const animation = element.getAnimations()[0]
+      if (!animation) throw new Error(`README spring element has no native animation: ${element.className}`)
+      const timing = animation.effect?.getTiming()
+      const duration = Number(timing?.duration)
+      const delay = Number(timing?.delay ?? 0)
+      let currentTime = delay + duration * value
+      while (currentTime < 0) currentTime += duration
+      animation.currentTime = currentTime
+      const rect = element.getBoundingClientRect()
+      return { centerX: rect.x + rect.width / 2, centerY: rect.y + rect.height / 2 }
+    }, progress)
+  }
+  const springPlantStart = await seekSpring(springPlantSelector, 0.2)
+  const springPlantWithCurrent = await seekSpring(springPlantSelector, 0.8)
+  const springPlantTravel = Math.hypot(
+    springPlantWithCurrent.centerX - springPlantStart.centerX,
+    springPlantWithCurrent.centerY - springPlantStart.centerY,
+  )
+  const springBubbleStart = await seekSpring(springBubbleSelector, 0.18)
+  const springBubbleRisen = await seekSpring(springBubbleSelector, 0.78)
+  const springBubbleRise = springBubbleStart.centerY - springBubbleRisen.centerY
+  const springNightTime = (springNightIndex * slotSeconds + slotSeconds / 2) * 1000
+  await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), springNightTime)
+  const springNightPopulation = await page.$eval(`.readme-demo-scene-${springNightIndex}`, scene => ({
+    clusters: scene.querySelectorAll('[data-spring-cluster]').length,
+    bubbles: scene.querySelectorAll('[data-spring-bubble]').length,
+  }))
+  if (
+    springPopulation.clusters !== 3 || springPopulation.bubbles !== 6 ||
+    springNightPopulation.clusters !== 3 || springNightPopulation.bubbles !== 6 ||
+    springPlantTravel <= 0.35 || springPlantTravel >= 5 || springBubbleRise <= 12
+  ) {
+    throw new Error(`README spring growth is invalid: ${JSON.stringify({
+      springPopulation,
+      springNightPopulation,
+      springPlantTravel,
+      springBubbleRise,
+    })}`)
+  }
+  const spring = { ...springPopulation, night: springNightPopulation, plantTravel: springPlantTravel, bubbleRise: springBubbleRise }
+
   const summerDayIndex = scenes.findIndex(scene => scene.season === 'summer' && scene.phase === 'day')
   const summerNightIndex = scenes.findIndex(scene => scene.season === 'summer' && scene.phase === 'night')
   const summerDayTime = (summerDayIndex * slotSeconds + slotSeconds / 2) * 1000
@@ -168,11 +221,12 @@ try {
 
   writeFileSync(
     join(outputDirectory, 'report.json'),
-    JSON.stringify({ scenes: report, lotus, transitionOpacities, transformBefore, transformAfter, motionDelta }, null, 2) + '\n',
+    JSON.stringify({ scenes: report, spring, lotus, transitionOpacities, transformBefore, transformAfter, motionDelta }, null, 2) + '\n',
   )
   console.log(
     `${scenes.length} native environments verified across ${README_DEMO_LOOP_SECONDS}s; ` +
-    `lotus drifted ${lotusTravel.toFixed(2)}px; fish moved; motion delta ${motionDelta.toFixed(3)}`,
+    `spring bubble rose ${springBubbleRise.toFixed(2)}px; lotus drifted ${lotusTravel.toFixed(2)}px; ` +
+    `fish moved; motion delta ${motionDelta.toFixed(3)}`,
   )
 } finally {
   await browser.close()

@@ -10,7 +10,7 @@
       "name": "active-spring-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "5a8d56846591e03f6376edf8b1c7a0f1b39d5b7477b3a891fe1bbad7d9bf10fe",
+      "digest": "45c14247c1c2d7d34e942ef33b98cfb2bd850d3b37ba0faacd435119896b5671",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -19,7 +19,7 @@
       "name": "active-spring-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "e2b4c3a0ef14a99a3fd78f4227d3a26b5f64dae5a5eef3f45c3feb3e29c9e02b",
+      "digest": "1f493b002667201ba9f223fc307f7428925264c77d6e0c0b8084286e7e361be3",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -28,7 +28,7 @@
       "name": "active-spring-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "985201a8a29949796b5537f4c3d5d1ed7860f82a6b96b6aab2b25627bfb55dee",
+      "digest": "d6c41e894a898a2c250cb750bc927825f0599e4caf1d5594e5d30d1b56480875",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -37,7 +37,7 @@
       "name": "active-spring-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "19c73642c12706961da7650bedbfda98923cca1e9db7e15a4cd41c025aab3f1b",
+      "digest": "2dbf2035d39e0443666bcc295fc73291fab384aa48ceea2575077a6caa57abae",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -154,7 +154,7 @@
       "name": "sparse-spring-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "38904280a40c9640911613d91490ea06a7126c9b5b478db3d1464bd7d4898244",
+      "digest": "45e6111fc98c2cb9071c7e7fa5e21862398a2ffb5287bc47a11a785bafbe1261",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -163,7 +163,7 @@
       "name": "sparse-spring-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "cca4cb5990fd14c9484639c1e42a4dd9c35d9cd29b14a4383f74daba066497d0",
+      "digest": "f51d3b94ce3eaaf5d1df4b42ccc28c2935ca89344a15112053af5a649e098da8",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -172,7 +172,7 @@
       "name": "sparse-spring-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "eb34777a7841cb022e94758d00a482faa08f072c462456f2be244e1f5921f9b7",
+      "digest": "3cebe220d35d3fdf9a0e1200fa998a428a231f08a4160caa910030fcf96adcf6",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -181,7 +181,7 @@
       "name": "sparse-spring-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "393512a95b3da9e5f8cfb22ea73dadfd439f32e22ab0800ce89f78620f666422",
+      "digest": "c90e676cb0d3a9fb951eb0b6917b5226b3666cd50fd89d9dff8a4c02971bd117",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"

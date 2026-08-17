@@ -197,6 +197,144 @@ export function lilyPads(width: number, theme: Theme, seed: string, coverage = 1
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
+interface SpringPlantSite {
+  x: number
+  y: number
+  rotation: number
+  scale: number
+  blades: number
+}
+
+function springBladePath(length: number, width: number, bend: number): string {
+  return (
+    `M-${f1(width * 0.5)} 0 ` +
+    `C-${f1(width * 0.75)} -${f1(length * 0.34)} ${f1(bend - width * 0.48)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length)} ` +
+    `C${f1(bend + width * 0.48)} -${f1(length * 0.72)} ${f1(width * 0.75)} -${f1(length * 0.34)} ${f1(width * 0.5)} 0 Z`
+  )
+}
+
+function springPondweedSprig(length: number, bend: number, fill: string, highlight: string): string {
+  const nodes = [0.36, 0.58, 0.78]
+  const leaves = nodes
+    .map((position, index) => {
+      const x = bend * position * (0.72 + position * 0.28)
+      const y = -length * position
+      const leafLength = 4.2 - index * 0.35
+      const leafWidth = 1.45 - index * 0.08
+      return (
+        `<g transform="translate(${f1(x)} ${f1(y)})">` +
+        `<path d="M0 0 C-${f1(leafLength * 0.45)} -${f1(leafWidth)} -${f1(leafLength * 0.82)} -${f1(leafWidth)} -${f1(leafLength)} 0 ` +
+        `C-${f1(leafLength * 0.7)} ${f1(leafWidth * 0.86)} -${f1(leafLength * 0.3)} ${f1(leafWidth * 0.74)} 0 0 Z" fill="${fill}"/>` +
+        `<path d="M0 0 C${f1(leafLength * 0.45)} -${f1(leafWidth)} ${f1(leafLength * 0.82)} -${f1(leafWidth)} ${f1(leafLength)} 0 ` +
+        `C${f1(leafLength * 0.7)} ${f1(leafWidth * 0.86)} ${f1(leafLength * 0.3)} ${f1(leafWidth * 0.74)} 0 0 Z" fill="${fill}"/>` +
+        `</g>`
+      )
+    })
+    .join('')
+  const tipX = bend * 0.94
+  const tipY = -length * 0.94
+  return (
+    `<path d="M0 0 C0 -${f1(length * 0.34)} ${f1(bend * 0.62)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length)}" ` +
+    `fill="none" stroke="${highlight}" stroke-width="0.9" stroke-linecap="round" opacity="0.76"/>` +
+    leaves +
+    `<ellipse cx="${f1(tipX)}" cy="${f1(tipY)}" rx="1.45" ry="2.5" fill="${fill}" ` +
+    `transform="rotate(${f1(bend * 1.7)} ${f1(tipX)} ${f1(tipY)})"/>`
+  )
+}
+
+export function springWaterPlants(
+  width: number,
+  theme: Theme,
+  seed: string,
+  intensity: number,
+  currentDirection = 1,
+  currentStrength = 0.5,
+  surfaceActivity = 1,
+  daylight = 1,
+): string {
+  if (intensity < 0.08) return ''
+  const r = rng(`spring-growth:${seed}`)
+  const direction = currentDirection < 0 ? -1 : 1
+  const strength = clamp01(currentStrength)
+  const surface = clamp01(surfaceActivity)
+  const growth = 0.58 + clamp01(intensity) * 0.42
+  const sites: SpringPlantSite[] = [
+    { x: width * 0.17, y: LAYOUT.height + 2, rotation: 0, scale: 0.94, blades: 5 },
+    { x: width * 0.66, y: LAYOUT.height + 3, rotation: 0, scale: 0.76, blades: 5 },
+    { x: width * 0.84, y: LAYOUT.height + 2, rotation: 0, scale: 1, blades: 5 },
+  ]
+  const clusters = sites.map((site, clusterIndex) => {
+    const bias = direction * strength * (1.35 + clusterIndex * 0.18)
+    const swing = 1.7 + surface * 1.35 + clusterIndex * 0.18
+    const duration = 8.4 + clusterIndex * 1.5 + (1 - strength) * 2.2
+    const delay = 1.2 + clusterIndex * 2.7
+    let blades = ''
+    for (let bladeIndex = 0; bladeIndex < site.blades; bladeIndex++) {
+      const position = bladeIndex - (site.blades - 1) / 2
+      const offset = position * (4.6 + site.scale * 0.8) + (r() - 0.5) * 1.4
+      const length = (18 + r() * 10 + (bladeIndex % 2) * 2.5) * growth * site.scale
+      const bladeWidth = 2.6 + r() * 1.35
+      const bend = direction * (2.4 + strength * 3.8) + (r() - 0.5) * 4.4
+      const angle = position * 5.2 + (r() - 0.5) * 2.8
+      const bladeSwing = 0.7 + strength * 0.95 + (bladeIndex % 3) * 0.22
+      const bladeDuration = duration * (0.72 + r() * 0.24)
+      const bladeDelay = delay + bladeIndex * 0.8 + r()
+      const fill = bladeIndex % 3 === 0 ? theme.plankton[1] : theme.lily
+      const opacity = 0.62 + r() * 0.2
+      const bladeArtwork =
+        bladeIndex === 2
+          ? springPondweedSprig(length * 0.9, bend * 0.82, fill, theme.lilyLight)
+          : `<path d="${springBladePath(length, bladeWidth, bend)}" fill="${fill}" opacity="${opacity.toFixed(2)}"/>` +
+            `<path d="M0 -1 C0 -${f1(length * 0.34)} ${f1(bend * 0.58)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length * 0.92)}" ` +
+            `fill="none" stroke="${theme.lilyLight}" stroke-width="0.55" stroke-linecap="round" opacity="0.72"/>`
+      blades +=
+        `<g transform="translate(${f1(offset)} 0) rotate(${f1(angle)})">` +
+        `<g class="spring-blade" style="--blade-r0:${f1(-direction * bladeSwing * 0.45)}deg;` +
+        `--blade-r1:${f1(direction * bladeSwing)}deg;animation-duration:${f1(bladeDuration)}s;animation-delay:-${f1(bladeDelay)}s">` +
+        bladeArtwork +
+        `</g></g>`
+    }
+    return (
+      `<g data-spring-cluster="${clusterIndex}" transform="translate(${f1(site.x)} ${f1(site.y)}) rotate(${site.rotation})">` +
+      `<ellipse cx="1.8" cy="1.6" rx="${f1(13 * site.scale)}" ry="${f1(3.2 * site.scale)}" fill="rgba(0,20,25,0.16)"/>` +
+      `<g class="spring-plant" data-plant-current="${direction}" ` +
+      `style="--plant-r0:${f1(bias - swing)}deg;--plant-r1:${f1(bias + swing)}deg;` +
+      `animation-duration:${f1(duration)}s;animation-delay:-${f1(delay)}s">` +
+      blades +
+      `<ellipse rx="${f1(8.8 * site.scale)}" ry="${f1(2.2 * site.scale)}" fill="${theme.lily}" opacity="0.6"/>` +
+      `</g></g>`
+    )
+  }).join('')
+
+  let bubbles = ''
+  for (let index = 0; index < 6; index++) {
+    const source = sites[index % sites.length]
+    const x = source.x + (r() - 0.5) * 18
+    const y = source.y - 2 - r() * 4
+    const rise = 27 + r() * 25
+    const drift = direction * (4 + strength * 7) + (r() - 0.5) * 4
+    const duration = 7.2 + r() * 4.4
+    const delay = r() * duration
+    const radius = 1.25 + r() * 1.25
+    bubbles +=
+      `<g transform="translate(${f1(x)} ${f1(y)})">` +
+      `<g class="spring-bubble" data-spring-bubble="${index}" ` +
+      `style="--bubble-x:${f1(drift)}px;--bubble-y:-${f1(rise)}px;animation-duration:${f1(duration)}s;animation-delay:-${f1(delay)}s">` +
+      `<circle r="${f1(radius)}" fill="none" stroke="${theme.ripple}" stroke-width="0.72" opacity="0.7"/>` +
+      `<circle cx="-${f1(radius * 0.28)}" cy="-${f1(radius * 0.28)}" r="${f1(Math.max(0.28, radius * 0.2))}" fill="${theme.sheen}" opacity="0.68"/>` +
+      `</g></g>`
+  }
+
+  const opacity = Math.min(0.94, intensity * 0.94)
+  const bubbleOpacity = opacity * (0.52 + clamp01(daylight) * 0.48)
+  return (
+    `<g data-seasonal-part="spring-growth" data-spring-growth="${intensity.toFixed(3)}" opacity="${f1(opacity)}">` +
+    `<g data-spring-part="water-plants">${clusters}</g>` +
+    `<g data-spring-part="oxygen-bubbles" opacity="${f1(bubbleOpacity)}">${bubbles}</g>` +
+    `</g>`
+  )
+}
+
 function lotusState(openness: number) {
   return openness >= 0.72 ? 'open' : openness >= 0.3 ? 'opening' : 'sleeping'
 }
