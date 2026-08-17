@@ -6,7 +6,7 @@ smoke/
 reference/
 .motion-regression/
 .key-moment-regression/
-.showcase-regression/
+.readme-demo-regression/
 .visual-regression/
 site/demo.js
 .wrangler/

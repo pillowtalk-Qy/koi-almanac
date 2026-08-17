@@ -2,19 +2,19 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('README pond demo', () => {
-  it('embeds native animated SVGs directly for light and dark mode', () => {
+  it('embeds one native animated SVG containing every season and phase', () => {
     const readme = readFileSync('README.md', 'utf8')
+    const svg = readFileSync('assets/demo-almanac.svg', 'utf8')
 
-    expect(readme).toContain('srcset="assets/demo-dark.svg"')
-    expect(readme).toContain('src="assets/demo-light.svg"')
+    expect(readme).toContain('src="assets/demo-almanac.svg"')
     expect(readme).not.toContain('demo-cycle.svg')
-
-    for (const file of ['assets/demo-light.svg', 'assets/demo-dark.svg']) {
-      const svg = readFileSync(file, 'utf8')
-      expect(svg).toMatch(/^<svg /)
-      expect(svg).toContain('@keyframes fp0')
-      expect(svg).toContain('.pk,.rp{')
-      expect(svg).not.toContain('data:image/svg+xml;base64,')
-    }
+    expect(svg).toMatch(/^<svg /)
+    expect(svg.match(/data-readme-season=/g)).toHaveLength(8)
+    expect(svg.match(/data-readme-phase="day"/g)).toHaveLength(4)
+    expect(svg.match(/data-readme-phase="night"/g)).toHaveLength(4)
+    expect(svg).toContain('@keyframes rd0-fp0')
+    expect(svg).toContain('url(#rd0-fx)')
+    expect(svg).not.toContain('data:image/svg+xml;base64,')
+    expect(svg).not.toContain('<image')
   })
 })
