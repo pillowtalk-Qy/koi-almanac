@@ -26,8 +26,23 @@ The original edition remains available at
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.svg">
-  <img alt="An animated koi pond generated from a GitHub contribution graph" src="assets/demo-light.svg">
+  <img alt="Koi Almanac animated in summer daylight and summer night" src="assets/demo-light.svg">
 </picture>
+
+<sub>The animated hero follows your GitHub color scheme: summer daylight in light mode, and a
+firefly-lit summer night in dark mode.</sub>
+
+## Four seasons, eight living scenes
+
+These are verified frames from the current renderer, not concept art. Click any pond to open that
+exact date and time in the live explorer; the fish, water, wildlife and weather continue moving there.
+
+| Season | Day | Night |
+| --- | --- | --- |
+| **Spring**<br><sub>Clear water and the original pond ecology.</sub> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-04-15&time=12%3A00"><img width="360" alt="Spring pond in daylight" src="assets/showcase/spring-day.png"></a> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-04-15&time=23%3A00"><img width="360" alt="Spring pond at night" src="assets/showcase/spring-night.png"></a> |
+| **Summer**<br><sub>Lotus blooms by day; fireflies visit flowers at night.</sub> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-07-15&time=12%3A00"><img width="360" alt="Summer pond in daylight with lotus flowers" src="assets/showcase/summer-day.png"></a> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-07-15&time=23%3A00"><img width="360" alt="Summer pond at night with fireflies" src="assets/showcase/summer-night.png"></a> |
+| **Autumn**<br><sub>Maple leaves drift, rotate and leave wakes in the current.</sub> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-10-15&time=12%3A00"><img width="360" alt="Autumn pond in daylight with maple leaves" src="assets/showcase/autumn-day.png"></a> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-10-15&time=23%3A00"><img width="360" alt="Autumn pond at night with maple leaves" src="assets/showcase/autumn-night.png"></a> |
+| **Winter**<br><sub>Ice redirects fish; snow settles on ice and melts on water.</sub> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-01-15&time=12%3A00"><img width="360" alt="Winter pond in daylight with falling snow and ice" src="assets/showcase/winter-day.png"></a> | <a href="https://pillowtalk-qy.github.io/koi-almanac/?user=yyx990803&date=2026-01-15&time=23%3A00"><img width="360" alt="Winter pond at night with falling snow and ice" src="assets/showcase/winter-night.png"></a> |
 
 Your contributions become plankton: bigger and brighter the more you commit. Fish paths come from
 a deterministic steering-force simulation (momentum, capped turning force, a gentle wander), and
