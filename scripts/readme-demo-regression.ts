@@ -90,13 +90,20 @@ try {
   }))
   const seekSpring = async (selector: string, progress: number) => {
     return await page.$eval(selector, (element, value) => {
-      const animation = element.getAnimations()[0]
+      const ownAnimationName = getComputedStyle(element).animationName.split(',')[0]?.trim()
+      const animation = element.getAnimations().find(candidate =>
+        'animationName' in candidate && String(candidate.animationName) === ownAnimationName,
+      )
       if (!animation) throw new Error(`README spring element has no native animation: ${element.className}`)
       const timing = animation.effect?.getTiming()
       const duration = Number(timing?.duration)
       const delay = Number(timing?.delay ?? 0)
       let currentTime = delay + duration * value
-      while (currentTime < 0) currentTime += duration
+      if (currentTime < 0) {
+        const direction = getComputedStyle(element).animationDirection.split(',')[0]?.trim()
+        const cycle = direction?.startsWith('alternate') ? 2 : 1
+        currentTime += Math.ceil(-currentTime / (duration * cycle)) * duration * cycle
+      }
       animation.currentTime = currentTime
       const rect = element.getBoundingClientRect()
       return { centerX: rect.x + rect.width / 2, centerY: rect.y + rect.height / 2 }
@@ -120,7 +127,7 @@ try {
   if (
     springPopulation.clusters !== 3 || springPopulation.bubbles !== 6 ||
     springNightPopulation.clusters !== 3 || springNightPopulation.bubbles !== 6 ||
-    springPlantTravel <= 0.35 || springPlantTravel >= 5 || springBubbleRise <= 12
+    springPlantTravel <= 4 || springPlantTravel >= 10 || springBubbleRise <= 12
   ) {
     throw new Error(`README spring growth is invalid: ${JSON.stringify({
       springPopulation,

@@ -42,13 +42,20 @@ async function setProgress(page: Page, selectors: string[], progress: number) {
     for (const selector of selectors) {
       const element = document.querySelector(selector)
       if (!element) throw new Error(`Missing animated element: ${selector}`)
-      const animation = element.getAnimations()[0]
+      const ownAnimationName = getComputedStyle(element).animationName.split(',')[0]?.trim()
+      const animation = element.getAnimations().find(candidate =>
+        'animationName' in candidate && String(candidate.animationName) === ownAnimationName,
+      )
       if (!animation) throw new Error(`Missing animation: ${selector}`)
       const timing = animation.effect?.getTiming()
       const duration = Number(timing?.duration)
       const delay = Number(timing?.delay ?? 0)
       let currentTime = delay + duration * progress
-      while (currentTime < 0) currentTime += duration
+      if (currentTime < 0) {
+        const direction = getComputedStyle(element).animationDirection.split(',')[0]?.trim()
+        const cycle = direction?.startsWith('alternate') ? 2 : 1
+        currentTime += Math.ceil(-currentTime / (duration * cycle)) * duration * cycle
+      }
       animation.currentTime = currentTime
     }
   }, { selectors, progress })
@@ -83,7 +90,10 @@ async function opacity(page: Page, selector: string): Promise<number> {
 
 async function animationState(page: Page, selector: string) {
   return await page.$eval(selector, element => {
-    const animation = element.getAnimations()[0]
+    const ownAnimationName = getComputedStyle(element).animationName.split(',')[0]?.trim()
+    const animation = element.getAnimations().find(candidate =>
+      'animationName' in candidate && String(candidate.animationName) === ownAnimationName,
+    )
     return {
       transform: getComputedStyle(element).transform,
       currentTime: Number(animation?.currentTime),
@@ -182,18 +192,24 @@ try {
   const springPlantTravelX = springPlantWithCurrent.centerX - springPlantStart.centerX
   await setProgress(page, [springBubbleSelector], 0.18)
   const springBubbleStart = await box(page, springBubbleSelector)
+  const springBubbleStartState = await animationState(page, springBubbleSelector)
   await setProgress(page, [springBubbleSelector], 0.78)
   const springBubbleRisen = await box(page, springBubbleSelector)
+  const springBubbleRisenState = await animationState(page, springBubbleSelector)
   const springBubbleRise = springBubbleStart.centerY - springBubbleRisen.centerY
   assert(finiteBox(springPlantStart) && finiteBox(springPlantWithCurrent), 'Spring plant sway boxes are invalid')
   assert(
-    springPlantTravel > 0.35 && springPlantTravel < 5,
-    `Spring plant sway is ${springPlantTravel.toFixed(2)}px instead of a restrained current response: ` +
+    springPlantTravel > 4 && springPlantTravel < 10,
+    `Spring plant sway is ${springPlantTravel.toFixed(2)}px instead of a visible, restrained current response: ` +
       JSON.stringify({ springPlantStart, springPlantWithCurrent, springPlantStartState, springPlantCurrentState }),
   )
-  assert(Math.abs(springPlantTravelX) > 0.25, 'Spring plant sway no longer produces visible lateral motion')
+  assert(Math.abs(springPlantTravelX) > 3, 'Spring plant sway no longer produces clearly visible lateral motion')
   assert(finiteBox(springBubbleStart) && finiteBox(springBubbleRisen), 'Spring bubble rise boxes are invalid')
-  assert(springBubbleRise > 12, `Spring oxygen bubble only rose ${springBubbleRise.toFixed(2)}px`)
+  assert(
+    springBubbleRise > 12,
+    `Spring oxygen bubble only rose ${springBubbleRise.toFixed(2)}px: ` +
+      JSON.stringify({ springBubbleStart, springBubbleRisen, springBubbleStartState, springBubbleRisenState }),
+  )
   assert(springMotion.clusters === 3 && springMotion.bubbles === 6, 'Spring growth population changed unexpectedly')
   await capture(page, 'spring-growth-and-breathing')
   report.spring = {
@@ -203,6 +219,8 @@ try {
     startState: springPlantStartState,
     currentState: springPlantCurrentState,
     bubbleRise: springBubbleRise,
+    bubbleStartState: springBubbleStartState,
+    bubbleRisenState: springBubbleRisenState,
   }
 
   await load(page, summerDay.svg)

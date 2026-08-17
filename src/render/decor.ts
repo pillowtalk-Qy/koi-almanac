@@ -203,6 +203,7 @@ interface SpringPlantSite {
   rotation: number
   scale: number
   blades: number
+  kind: 'ribbon' | 'pondweed' | 'fanwort'
 }
 
 function springBladePath(length: number, width: number, bend: number): string {
@@ -214,45 +215,50 @@ function springBladePath(length: number, width: number, bend: number): string {
 }
 
 function springPondweedSprig(length: number, bend: number, fill: string, highlight: string): string {
-  const nodes = [0.3, 0.47, 0.64, 0.79]
+  const nodes = [0.34, 0.58, 0.78]
   const leaves = nodes
     .map((position, index) => {
       const x = bend * position * (0.72 + position * 0.28)
       const y = -length * position
       const side = index % 2 === 0 ? -1 : 1
-      const leafLength = 5 - index * 0.42
-      const leafWidth = 1.7 - index * 0.09
+      const leafLength = 7.4 - index * 0.65
+      const leafWidth = 2.4 - index * 0.15
       const tipX = side * leafLength
+      const tipY = -leafLength * (0.32 + index * 0.05)
       return (
         `<g transform="translate(${f1(x)} ${f1(y)})">` +
-        `<path d="M0 0 C${f1(tipX * 0.42)} -${f1(leafWidth)} ${f1(tipX * 0.82)} -${f1(leafWidth * 0.82)} ${f1(tipX)} 0 ` +
-        `C${f1(tipX * 0.68)} ${f1(leafWidth * 0.86)} ${f1(tipX * 0.26)} ${f1(leafWidth * 0.68)} 0 0 Z" fill="${fill}"/>` +
+        `<path d="M0 0 C${f1(tipX * 0.34)} ${f1(tipY - leafWidth)} ${f1(tipX * 0.82)} ${f1(tipY - leafWidth * 0.6)} ${f1(tipX)} ${f1(tipY)} ` +
+        `C${f1(tipX * 0.7)} ${f1(tipY + leafWidth * 0.84)} ${f1(tipX * 0.22)} ${f1(leafWidth * 0.5)} 0 0 Z" fill="${fill}"/>` +
         `</g>`
       )
     })
     .join('')
-  const tipX = bend * 0.94
-  const tipY = -length * 0.94
   return (
     `<path d="M0 0 C0 -${f1(length * 0.34)} ${f1(bend * 0.62)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length)}" ` +
     `fill="none" stroke="${highlight}" stroke-width="0.9" stroke-linecap="round" opacity="0.76"/>` +
     leaves +
-    `<path d="M${f1(tipX)} ${f1(tipY)} C${f1(tipX + 2.8)} ${f1(tipY - 1.4)} ${f1(tipX + 3.8)} ${f1(tipY + 1.5)} ${f1(tipX + 1.4)} ${f1(tipY + 2.1)} ` +
-    `C${f1(tipX - 0.3)} ${f1(tipY + 2.6)} ${f1(tipX - 0.8)} ${f1(tipY + 0.7)} ${f1(tipX + 0.7)} ${f1(tipY + 0.4)}" ` +
-    `fill="none" stroke="${highlight}" stroke-width="1.55" stroke-linecap="round"/>`
+    `<path d="M${f1(bend)} -${f1(length)} q-3.8 1.3 -5 4 M${f1(bend)} -${f1(length)} q4.1 1 5.2 3.8" ` +
+    `fill="none" stroke="${fill}" stroke-width="1.8" stroke-linecap="round"/>`
   )
 }
 
-function springFiddlehead(length: number, bend: number, stem: string, tip: string): string {
-  const x = bend * 0.88
-  const y = -length * 0.78
-  const turn = bend < 0 ? -1 : 1
+function springFanwortSprig(length: number, bend: number, stem: string, leaf: string): string {
+  const crownX = bend * 0.88
+  const crownY = -length * 0.82
+  const fan = [
+    [-7.4, -0.8], [-5.4, -4.8], [-2.3, -7], [1.2, -7.8], [4.7, -5.4], [7.1, -1.8],
+  ].map(([dx, dy], index) => (
+    `<path d="M${f1(crownX)} ${f1(crownY)} Q${f1(crownX + dx * 0.45)} ${f1(crownY + dy * 0.72)} ${f1(crownX + dx)} ${f1(crownY + dy)}" ` +
+    `fill="none" stroke="${leaf}" stroke-width="${index === 0 || index === 5 ? '1.15' : '1.35'}" stroke-linecap="round"/>`
+  )).join('')
+  const lowerFanY = -length * 0.57
+  const lowerFanX = bend * 0.57
   return (
-    `<path d="M0 0 C${f1(bend * 0.08)} -${f1(length * 0.32)} ${f1(bend * 0.55)} -${f1(length * 0.64)} ${f1(x)} ${f1(y)} ` +
-    `C${f1(x + turn * 4.2)} ${f1(y - 2.8)} ${f1(x + turn * 5.4)} ${f1(y + 2.7)} ${f1(x + turn * 1.2)} ${f1(y + 3.5)} ` +
-    `C${f1(x - turn * 1.2)} ${f1(y + 3.9)} ${f1(x - turn * 1.4)} ${f1(y + 0.8)} ${f1(x + turn * 0.8)} ${f1(y + 0.5)}" ` +
-    `fill="none" stroke="${stem}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<circle cx="${f1(x + turn * 0.8)}" cy="${f1(y + 0.5)}" r="1.15" fill="${tip}" opacity="0.9"/>`
+    `<path d="M0 0 C${f1(bend * 0.08)} -${f1(length * 0.34)} ${f1(bend * 0.62)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length)}" ` +
+    `fill="none" stroke="${stem}" stroke-width="1.35" stroke-linecap="round"/>` +
+    `<path d="M${f1(lowerFanX)} ${f1(lowerFanY)} q-5 -4.6 -7.8 -2.6 M${f1(lowerFanX)} ${f1(lowerFanY)} q5.2 -4.2 7.8 -2" ` +
+    `fill="none" stroke="${leaf}" stroke-width="1.05" stroke-linecap="round"/>` +
+    fan
   )
 }
 
@@ -273,36 +279,37 @@ export function springWaterPlants(
   const surface = clamp01(surfaceActivity)
   const growth = 0.58 + clamp01(intensity) * 0.42
   const sites: SpringPlantSite[] = [
-    { x: width * 0.14, y: LAYOUT.height - 1, rotation: 0, scale: 0.98, blades: 5 },
-    { x: width * 0.56, y: LAYOUT.height - 2, rotation: 0, scale: 0.88, blades: 5 },
-    { x: width * 0.84, y: LAYOUT.height - 1, rotation: 0, scale: 1.05, blades: 5 },
+    { x: width * 0.14, y: LAYOUT.height - 4, rotation: 0, scale: 1.12, blades: 5, kind: 'ribbon' },
+    { x: width * 0.56, y: LAYOUT.height - 5, rotation: 0, scale: 1.12, blades: 3, kind: 'pondweed' },
+    { x: width * 0.84, y: LAYOUT.height - 4, rotation: 0, scale: 1.16, blades: 3, kind: 'fanwort' },
   ]
   const clusters = sites.map((site, clusterIndex) => {
     const bias = direction * strength * (1.35 + clusterIndex * 0.18)
-    const swing = 1.7 + surface * 1.35 + clusterIndex * 0.18
-    const duration = 8.4 + clusterIndex * 1.5 + (1 - strength) * 2.2
+    const swing = 7.2 + surface * 4.2 + clusterIndex * 0.45
+    const duration = 4.1 + clusterIndex * 0.62 + (1 - strength) * 0.9
     const delay = 1.2 + clusterIndex * 2.7
     let blades = ''
     for (let bladeIndex = 0; bladeIndex < site.blades; bladeIndex++) {
       const position = bladeIndex - (site.blades - 1) / 2
-      const offset = position * (4.6 + site.scale * 0.8) + (r() - 0.5) * 1.4
-      const length = (22 + r() * 12 + (bladeIndex % 2) * 3) * growth * site.scale
-      const bladeWidth = 3.1 + r() * 1.45
-      const bend = direction * (3.2 + strength * 4.8) + (r() - 0.5) * 4.8
-      const angle = position * 5.2 + (r() - 0.5) * 2.8
-      const bladeSwing = 0.7 + strength * 0.95 + (bladeIndex % 3) * 0.22
-      const bladeDuration = duration * (0.72 + r() * 0.24)
+      const offset = position * (5 + site.scale * 0.9) + (r() - 0.5) * 1.5
+      const length = (29 + r() * 15 + (bladeIndex % 2) * 4) * growth * site.scale
+      const bladeWidth = 3.8 + r() * 1.8
+      const bend = direction * (4.8 + strength * 6.3) + (r() - 0.5) * 6.4
+      const angle = position * 7 + (r() - 0.5) * 3.5
+      const bladeSwing = 4.2 + strength * 4 + (bladeIndex % 3) * 0.7
+      const bladeDuration = duration * (0.72 + r() * 0.18)
       const bladeDelay = delay + bladeIndex * 0.8 + r()
       const fill = bladeIndex % 3 === 0 ? theme.plankton[2] : theme.lily
       const opacity = 0.72 + r() * 0.2
-      const bladeArtwork =
-        bladeIndex === 2
-          ? springFiddlehead(length, bend, theme.plankton[1], theme.plankton[3])
-          : bladeIndex === 1 || bladeIndex === 3
-          ? springPondweedSprig(length * 0.9, bend * 0.82, theme.plankton[1], theme.plankton[3])
-          : `<path d="${springBladePath(length, bladeWidth, bend)}" fill="${fill}" opacity="${opacity.toFixed(2)}"/>` +
-            `<path d="M0 -1 C0 -${f1(length * 0.34)} ${f1(bend * 0.58)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length * 0.92)}" ` +
-            `fill="none" stroke="${theme.lilyLight}" stroke-width="0.55" stroke-linecap="round" opacity="0.72"/>`
+      const ribbon =
+        `<path d="${springBladePath(length, bladeWidth, bend)}" fill="${fill}" opacity="${opacity.toFixed(2)}"/>` +
+        `<path d="M0 -1 C0 -${f1(length * 0.34)} ${f1(bend * 0.58)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length * 0.92)}" ` +
+        `fill="none" stroke="${theme.lilyLight}" stroke-width="0.7" stroke-linecap="round" opacity="0.8"/>`
+      const bladeArtwork = site.kind === 'ribbon'
+        ? ribbon
+        : site.kind === 'pondweed'
+          ? springPondweedSprig(length * (bladeIndex === 1 ? 1.08 : 0.9), bend * 0.9, theme.plankton[2], theme.plankton[3])
+          : springFanwortSprig(length * (bladeIndex === 1 ? 1.06 : 0.88), bend * 0.82, theme.plankton[2], theme.plankton[3])
       blades +=
         `<g transform="translate(${f1(offset)} 0) rotate(${f1(angle)})">` +
         `<g class="spring-blade" style="--blade-r0:${f1(-direction * bladeSwing * 0.45)}deg;` +
@@ -311,13 +318,16 @@ export function springWaterPlants(
         `</g></g>`
     }
     return (
-      `<g data-spring-cluster="${clusterIndex}" transform="translate(${f1(site.x)} ${f1(site.y)}) rotate(${site.rotation})">` +
-      `<ellipse cx="1.8" cy="1.6" rx="${f1(14 * site.scale)}" ry="${f1(3.2 * site.scale)}" fill="rgba(0,20,25,0.16)"/>` +
+      `<g data-spring-cluster="${clusterIndex}" data-spring-kind="${site.kind}" transform="translate(${f1(site.x)} ${f1(site.y)}) rotate(${site.rotation})">` +
+      `<ellipse cx="1.8" cy="2.4" rx="${f1(15 * site.scale)}" ry="${f1(3.7 * site.scale)}" fill="rgba(0,20,25,0.17)"/>` +
+      `<circle cx="-${f1(7.2 * site.scale)}" cy="1.2" r="${f1(2.2 * site.scale)}" fill="${theme.pebbles[1]}" opacity="0.78"/>` +
+      `<circle cx="${f1(7.8 * site.scale)}" cy="1.5" r="${f1(2.7 * site.scale)}" fill="${theme.pebbles[2]}" opacity="0.72"/>` +
       `<g class="spring-plant" data-plant-current="${direction}" ` +
       `style="--plant-r0:${f1(bias - swing)}deg;--plant-r1:${f1(bias + swing)}deg;` +
       `animation-duration:${f1(duration)}s;animation-delay:-${f1(delay)}s">` +
       blades +
-      `<ellipse rx="${f1(9.4 * site.scale)}" ry="${f1(2.2 * site.scale)}" fill="${theme.plankton[1]}" opacity="0.76"/>` +
+      `<path d="M-${f1(10 * site.scale)} 1.4 Q0 -2.8 ${f1(10 * site.scale)} 1.4 Q0 4.2 -${f1(10 * site.scale)} 1.4 Z" ` +
+      `fill="${theme.plankton[1]}" opacity="0.76"/>` +
       `</g></g>`
     )
   }).join('')
@@ -357,64 +367,58 @@ function lotusState(openness: number) {
 
 function lotusPetal(radius: number, halfWidth: number): string {
   return (
-    `M-${f1(radius * 0.06)} 0 ` +
-    `C${f1(radius * 0.16)} -${f1(halfWidth)} ${f1(radius * 0.62)} -${f1(halfWidth * 0.95)} ${f1(radius * 0.86)} -${f1(halfWidth * 0.36)} ` +
-    `C${f1(radius * 1.02)} -${f1(halfWidth * 0.12)} ${f1(radius * 1.02)} ${f1(halfWidth * 0.12)} ${f1(radius * 0.86)} ${f1(halfWidth * 0.36)} ` +
-    `C${f1(radius * 0.62)} ${f1(halfWidth * 0.95)} ${f1(radius * 0.16)} ${f1(halfWidth)} -${f1(radius * 0.06)} 0 Z`
+    `M0 0 ` +
+    `C${f1(radius * 0.2)} -${f1(halfWidth)} ${f1(radius * 0.67)} -${f1(halfWidth * 0.94)} ${f1(radius)} 0 ` +
+    `C${f1(radius * 0.67)} ${f1(halfWidth * 0.94)} ${f1(radius * 0.2)} ${f1(halfWidth)} 0 0 Z`
   )
 }
 
 function openLotus(theme: Theme, radius: number, delay = 0): string {
-  const outerAngles = [-2, 34, 70, 106, 142, 178, 214, 250, 286, 322]
-  const innerAngles = [17, 68, 120, 171, 223, 274, 326]
-  const outerPath = lotusPetal(radius, radius * 0.36)
-  const innerPath = lotusPetal(radius * 0.72, radius * 0.3)
-  const outer = outerAngles
-    .map((angle, index) =>
-      `<path d="${outerPath}" transform="rotate(${angle})" fill="${theme.lotusOuter}" ` +
-      `opacity="${index % 2 === 0 ? '0.92' : '0.86'}" stroke="${theme.lotusInner}" stroke-width="0.2" stroke-opacity="0.42"/>`,
+  const outerSpecs = [
+    [-8, 1.12, 0.43], [43, 0.9, 0.46], [92, 1.07, 0.42], [145, 0.92, 0.45],
+    [198, 1.1, 0.43], [252, 0.9, 0.46], [308, 1.02, 0.43],
+  ]
+  const innerSpecs = [[18, 0.72], [86, 0.64], [158, 0.7], [231, 0.63], [304, 0.7]]
+  const outer = outerSpecs
+    .map(([angle, length, width], index) =>
+      `<path d="${lotusPetal(radius * length, radius * width)}" transform="rotate(${angle})" fill="${theme.lotusOuter}" ` +
+      `opacity="${index % 2 === 0 ? '0.94' : '0.84'}" stroke="${theme.lotusInner}" stroke-width="0.28" stroke-opacity="0.5"/>`,
     )
     .join('')
-  const inner = innerAngles
-    .map((angle, index) =>
-      `<path d="${innerPath}" transform="rotate(${angle})" fill="${theme.lotusInner}" ` +
+  const inner = innerSpecs
+    .map(([angle, length], index) =>
+      `<path d="${lotusPetal(radius * length, radius * 0.36)}" transform="rotate(${angle})" fill="${theme.lotusInner}" ` +
       `opacity="${index % 2 === 0 ? '0.98' : '0.9'}"/>`,
     )
     .join('')
-  const heartRadius = radius * 0.19
-  const stamens = Array.from({ length: 6 }, (_, index) => {
-    const angle = (index / 6) * Math.PI * 2
-    return `<circle cx="${f1(Math.cos(angle) * heartRadius)}" cy="${f1(Math.sin(angle) * heartRadius)}" r="${f1(radius * 0.06)}" fill="${theme.lotusHeart}"/>`
+  const stamens = Array.from({ length: 5 }, (_, index) => {
+    const angle = (index / 5) * Math.PI * 2 - 0.2
+    return `<circle cx="${f1(Math.cos(angle) * radius * 0.12)}" cy="${f1(Math.sin(angle) * radius * 0.09)}" r="${f1(radius * 0.032)}" fill="${theme.lotusInner}" opacity="0.82"/>`
   }).join('')
   return (
-    `<g class="bloom lotus-bloom" style="animation-delay:-${f1(delay)}s">` +
+    `<g class="bloom lotus-bloom" data-lotus-petal-layout="lobed" style="animation-delay:-${f1(delay)}s">` +
     outer + inner +
-    `<circle r="${f1(radius * 0.22)}" fill="${theme.lotusHeart}" opacity="0.94"/>` +
-    `<circle r="${f1(radius * 0.08)}" fill="${theme.lotusInner}" opacity="0.62"/>` +
+    `<ellipse rx="${f1(radius * 0.22)}" ry="${f1(radius * 0.17)}" transform="rotate(-12)" fill="${theme.lotusHeart}" opacity="0.96"/>` +
     stamens +
     `</g>`
   )
 }
 
 function closedLotusBud(theme: Theme, radius: number): string {
-  const outerPetal = lotusPetal(radius * 0.72, radius * 0.44)
-  const innerPetal = lotusPetal(radius * 0.5, radius * 0.34)
-  const outer = [0, 45, 90, 135, 180, 225, 270, 315]
-    .map((angle, index) =>
-      `<path d="${outerPetal}" transform="rotate(${angle})" fill="${theme.lotusOuter}" ` +
-      `opacity="${index % 2 === 0 ? '0.9' : '0.82'}" stroke="${theme.lotusInner}" stroke-width="0.22" stroke-opacity="0.4"/>`,
-    )
-    .join('')
-  const inner = [18, 90, 162, 234, 306]
-    .map((angle, index) =>
-      `<path d="${innerPetal}" transform="rotate(${angle})" fill="${theme.lotusInner}" opacity="${index % 2 === 0 ? '0.94' : '0.86'}"/>`,
-    )
-    .join('')
+  const budPetal = (height: number, halfWidth: number, lean: number) =>
+    `M0 ${f1(radius * 0.48)} C-${f1(halfWidth)} ${f1(radius * 0.06)} ${f1(lean - halfWidth * 0.72)} -${f1(height * 0.7)} ${f1(lean)} -${f1(height)} ` +
+    `C${f1(lean + halfWidth * 0.72)} -${f1(height * 0.7)} ${f1(halfWidth)} ${f1(radius * 0.06)} 0 ${f1(radius * 0.48)} Z`
   return (
-    `<ellipse cx="1" cy="1.5" rx="${f1(radius * 0.95)}" ry="${f1(radius * 0.72)}" fill="rgba(0,20,25,0.16)"/>` +
-    outer + inner +
-    `<circle r="${f1(radius * 0.24)}" fill="${theme.lotusHeart}" opacity="0.9"/>` +
-    `<circle r="${f1(radius * 0.09)}" fill="${theme.lotusInner}" opacity="0.72"/>`
+    `<path d="M-${f1(radius * 0.82)} ${f1(radius * 0.4)} Q0 ${f1(radius * 0.8)} ${f1(radius * 0.82)} ${f1(radius * 0.4)}" ` +
+    `fill="none" stroke="rgba(0,20,25,0.18)" stroke-width="${f1(radius * 0.55)}" stroke-linecap="round"/>` +
+    `<g data-lotus-bud-layout="folded-petals" transform="translate(0 ${f1(radius * 0.1)}) rotate(-9)">` +
+    `<path d="${budPetal(radius * 0.83, radius * 0.4, -radius * 0.18)}" transform="translate(-${f1(radius * 0.22)} 0) rotate(-13)" fill="${theme.lotusOuter}" opacity="0.84"/>` +
+    `<path d="${budPetal(radius * 0.78, radius * 0.38, radius * 0.16)}" transform="translate(${f1(radius * 0.22)} 0) rotate(13)" fill="${theme.lotusOuter}" opacity="0.8"/>` +
+    `<path d="${budPetal(radius * 1.06, radius * 0.4, 0)}" fill="${theme.lotusInner}" opacity="0.96" ` +
+    `stroke="${theme.lotusOuter}" stroke-width="0.34" stroke-opacity="0.66"/>` +
+    `<path d="M0 ${f1(radius * 0.42)} C-${f1(radius * 0.18)} -${f1(radius * 0.05)} -${f1(radius * 0.11)} -${f1(radius * 0.5)} 0 -${f1(radius * 0.66)}" ` +
+    `fill="none" stroke="${theme.lotusOuter}" stroke-width="0.72" stroke-linecap="round" opacity="0.72"/>` +
+    `</g>`
   )
 }
 
@@ -426,13 +430,15 @@ function smallLotus(theme: Theme, scale: number, delay: number, openness: number
   const openScaleY = 0.46 + open * 0.54
   return (
     `<g data-lotus-state="${lotusState(open)}" data-lotus-openness="${open.toFixed(3)}" transform="scale(${f1(scale)})">` +
-    `<ellipse class="lotus-water-shadow" cx="1.4" cy="2.2" rx="7.4" ry="5.2" fill="rgba(0,20,25,0.16)"/>` +
-    `<ellipse class="lotus-waterline" rx="7.8" ry="3.7" fill="none" stroke="${theme.lilyLight}" stroke-width="0.55" opacity="0.5"/>` +
+    `<path class="lotus-water-shadow" d="M-7.4 2.4 Q0 6.1 7.4 2.4 Q0 4.4 -7.4 2.4 Z" fill="rgba(0,20,25,0.16)"/>` +
+    `<path class="lotus-waterline" d="M-7.4 2.2 Q0 5.6 7.4 2.2" fill="none" stroke="${theme.lilyLight}" stroke-width="0.65" stroke-linecap="round" opacity="0.56"/>` +
+    `<g data-lotus-flower-anchor="offset" transform="translate(-2.4 -2)">` +
     `<g class="lotus-open-stage" opacity="${openOpacity.toFixed(3)}" transform="scale(${f1(openScaleX)} ${f1(openScaleY)})">` +
-    openLotus(theme, 8, delay) +
+    openLotus(theme, 9.8, delay) +
     `</g>` +
     `<g class="summer-lotus-bud" data-lotus-form="closed-bud" data-lotus-view="top-down-folded" opacity="${(budOpacity * 0.88).toFixed(3)}" style="animation-delay:-${f1(delay * 0.6)}s">` +
     closedLotusBud(theme, 6.8) +
+    `</g>` +
     `</g>` +
     `</g>`
   )
@@ -726,16 +732,23 @@ export function lotus(
   const budOpacity = 1 - clamp01((open - 0.22) / 0.55)
   const openScaleX = 0.56 + open * 0.44
   const openScaleY = 0.46 + open * 0.54
+  const padPath = 'M9.8 -8 C13.2 -3.2 12.6 4.6 7.8 9.4 C2.1 14.1 -7.1 12.6 -11.4 6.3 C-15.1 0.8 -12.2 -7.6 -5.5 -11.2 C0.1 -14.1 6.5 -12.2 9.8 -8 L0 0 Z'
   const pondLotus =
     `<ellipse cx="2.5" cy="3.5" rx="13" ry="12" fill="rgba(0,20,25,0.2)"/>` +
-    `<circle r="12.5" fill="${theme.lily}" opacity="0.9"/>` +
-    `<circle r="12.5" fill="none" stroke="${theme.lilyLight}" stroke-width="1.4" opacity="0.8"/>` +
+    `<g data-lotus-pad="notched">` +
+    `<path d="${padPath}" fill="${theme.lily}" opacity="0.9"/>` +
+    `<path d="${padPath}" fill="none" stroke="${theme.lilyLight}" stroke-width="1.4" opacity="0.8"/>` +
+    `<path d="M0 0 L8.8 -7.2 M0 0 L-8.3 2 M0 0 L-2.2 9" ` +
+    `fill="none" stroke="${theme.lilyVein}" stroke-width="0.9" opacity="0.72"/>` +
+    `</g>` +
     `<g data-lotus-state="${lotusState(open)}" data-lotus-openness="${open.toFixed(3)}">` +
+    `<g data-lotus-flower-anchor="offset" transform="translate(-3 -2)">` +
     `<g class="lotus-open-stage" opacity="${openOpacity.toFixed(3)}" transform="scale(${f1(openScaleX)} ${f1(openScaleY)})">` +
-    openLotus(theme, 8.2) +
+    openLotus(theme, 9.6) +
     `</g>` +
     `<g class="lotus-bud" data-lotus-form="closed-bud" data-lotus-view="top-down-folded" opacity="${budOpacity.toFixed(3)}">` +
     closedLotusBud(theme, 7) +
+    `</g>` +
     `</g>` +
     `</g>`
   const floatingLotus = motion
