@@ -10,7 +10,7 @@
       "name": "active-spring-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "be83b0d74fe911b442bd4050c28f2ce38db13ca69696f81b535f3bfc6231b23e",
+      "digest": "6348c5bb007e959c4957835ff25de9ef79409f6551792945143b78b48629235c",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -19,7 +19,7 @@
       "name": "active-spring-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "6525e0736353d9a4f0632f95dbfb3da7ec101935f8aa72edcccf1b8c271b39c6",
+      "digest": "c03ac631a223ec38f593bd8efe4f693fdd78fdd2a53c6e22b595e0e10708218e",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -28,7 +28,7 @@
       "name": "active-spring-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "7d6dbaa1929147bd2b93138fa73d45b724c64b954afdb69b06b0c5ebedd3282e",
+      "digest": "74025d7eb84574e4411826c9079cc0779685b477cc08cd83a1ad47ad9f94610e",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -37,7 +37,7 @@
       "name": "active-spring-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "39e79d4470e30faa9451aa617029171a60f03b735d846b8389359bff58c73c64",
+      "digest": "02ff1365aa251d309b7c923c76d261788197d41c4873f90bd072f36fbc642054",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -46,7 +46,7 @@
       "name": "active-summer-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "354b31961d98028bec26303929cd6033b9d8f220a7d532bf0dc3a94cfbbfaeae",
+      "digest": "3a12ca6c6777e5b30dd552ba63f2cdb61104f743a6b2b121a0946f6f24c63055",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -55,7 +55,7 @@
       "name": "active-summer-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "f1e7a6d50bc7100afd303021f2124e4c077a51385f9a61840345811f8fcb48a9",
+      "digest": "d320faada7d1d29db17ea6479ac7076ac9ae210aaee8b424801ce10df9954ef1",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -64,7 +64,7 @@
       "name": "active-summer-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "e0a58e24a500bf381d4a61b003d71016a3930dd6141586df8dd78f596ed30fd7",
+      "digest": "8c433dd78b51503212c6b9c50163bab2db76f8e52f34f533266fa41fb0bb8387",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -73,7 +73,7 @@
       "name": "active-summer-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "564f404a9bade689aa61a3a73b7bb89e4067e92c2ba7efa1dedde5bffa001896",
+      "digest": "06cd09b5ce858416a7119d7b946defeaa08148ddb7fe0fd4975f4b968fb3c040",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -82,7 +82,7 @@
       "name": "active-autumn-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "3b6e8d526e48c03ddee592cd773751ba7dff9248fa80d83a4940aa26290693a7",
+      "digest": "efc7d8ba748e243047b2022ab030f800991d1695e9060bb67fd18b57fa750bf3",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -154,7 +154,7 @@
       "name": "sparse-spring-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "3e38162aebca7e71a283fcfb87c43ad448d7254e200758e6fe6bb9f48aa3b03f",
+      "digest": "a0e236bb028127baadd5d1a1b720cff055b7baad425e4be8c09d5466e1c40641",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -163,7 +163,7 @@
       "name": "sparse-spring-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "e2d31bd55c1fc54d2563ce9d9e2926f29268c7453d34713c0a44c68f0f3421b3",
+      "digest": "a686b203e94e7867f72b7e4832c6e41af98f4a03c3bdd7fd6bc01311cf622780",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -172,7 +172,7 @@
       "name": "sparse-spring-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "52b91f30745954dca914f96d4adc0dfa37f1d73eceab08819a86d177a2180675",
+      "digest": "9b03681b4f0c835de087a9e124afa334893605184081b9240767377dd8933173",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -181,7 +181,7 @@
       "name": "sparse-spring-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "bac7729d845dff3d5bce4dc94ae6fd0995be4efce23415f0c2673f6d5fbabb71",
+      "digest": "c0ef5c621247fd37719f31d0ff9b89935a856d39ebb87e1478e30798a36723c0",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -190,7 +190,7 @@
       "name": "sparse-summer-day-desktop",
       "width": 737,
       "height": 186,
-      "digest": "d3a4cc6518ab3d95e28f497a7476cfae3edcc6bde7b6b60c96c6750f674054d7",
+      "digest": "e0809565644f122cf5dccf4780d532acbc92d1756476814011f644f26cb5c5b6",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -199,7 +199,7 @@
       "name": "sparse-summer-day-mobile",
       "width": 390,
       "height": 98,
-      "digest": "9e4fdd45112ead22c506e4585e68a89fedf181ae2113edb0c9aa2d574b484009",
+      "digest": "280af35f75c0695580b94700d414690dd07ca375378e709f435612aa6e220c3b",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -208,7 +208,7 @@
       "name": "sparse-summer-night-desktop",
       "width": 737,
       "height": 186,
-      "digest": "eae1ea571c26f9a18a85ead3908b2412a6f2ddac24fa9096d0df079520e3aec7",
+      "digest": "73800289fd2c8b924242c2c39913614cf034a9f94d17817cd67d3880c39a63a3",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"
@@ -217,7 +217,7 @@
       "name": "sparse-summer-night-mobile",
       "width": 390,
       "height": 98,
-      "digest": "ddf0329600ed3a38c646aed2c1304065384635f899b6822b617d2b3d44fdffcd",
+      "digest": "682b8e3924b7dd340256d057013f7f9f6bc712a54d3197d044ff206ffa81ffb5",
       "mismatchRatio": 0,
       "meanDelta": 0,
       "status": "created"

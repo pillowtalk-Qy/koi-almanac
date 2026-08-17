@@ -1,10 +1,13 @@
 const CACHE_TTL_SECONDS = 15 * 60
+const STALE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+const UPSTREAM_ATTEMPTS = 2
 const CALENDAR_LOOKBACK_DAYS = 370
 const MAX_CALENDAR_BYTES = 2_000_000
 const USERNAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/
 const LOCAL_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/
 
 type ContributionLevel = 0 | 1 | 2 | 3 | 4
+type CacheStatus = 'HIT' | 'MISS' | 'STALE'
 
 interface ContributionDay {
   date: string
@@ -114,17 +117,37 @@ async function fetchCalendarRange(username: string, range: CalendarRange): Promi
   const url = new URL(`/users/${encodeURIComponent(username)}/contributions`, 'https://github.com')
   url.searchParams.set('from', range.from)
   url.searchParams.set('to', range.to)
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'text/html',
-      'User-Agent': 'koi-almanac-contributions/1.0 (+https://github.com/pillowtalk-Qy/koi-almanac)',
-    },
-  })
-  if (response.status === 404) throw new HTTPError(404, `GitHub user not found: ${username}`)
-  if (!response.ok) throw new HTTPError(502, `GitHub contribution calendar responded ${response.status}`)
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('text/html')) throw new HTTPError(502, 'GitHub returned an unexpected response')
-  return parseContributionCalendar(response)
+  let lastStatus = 0
+  for (let attempt = 0; attempt < UPSTREAM_ATTEMPTS; attempt++) {
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: 'text/html',
+          'User-Agent': 'koi-almanac-contributions/1.0 (+https://github.com/pillowtalk-Qy/koi-almanac)',
+        },
+      })
+    } catch {
+      if (attempt === UPSTREAM_ATTEMPTS - 1) throw new HTTPError(502, 'GitHub contribution calendar is unavailable')
+      await scheduler.wait(150 * (attempt + 1))
+      continue
+    }
+    lastStatus = response.status
+    if (response.status === 404) throw new HTTPError(404, `GitHub user not found: ${username}`)
+    if (!response.ok) {
+      const retryable = response.status === 429 || response.status >= 500
+      if (retryable && attempt < UPSTREAM_ATTEMPTS - 1) {
+        await response.body?.cancel()
+        await scheduler.wait(150 * (attempt + 1))
+        continue
+      }
+      throw new HTTPError(502, `GitHub contribution calendar responded ${response.status}`)
+    }
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('text/html')) throw new HTTPError(502, 'GitHub returned an unexpected response')
+    return parseContributionCalendar(response)
+  }
+  throw new HTTPError(502, `GitHub contribution calendar responded ${lastStatus || 'with an error'}`)
 }
 
 async function fetchContributions(username: string): Promise<ContributionDay[]> {
@@ -148,7 +171,7 @@ function allowedOrigin(request: Request, env: Env): string | null | undefined {
   return undefined
 }
 
-function responseHeaders(origin: string | null, cacheStatus?: 'HIT' | 'MISS'): Headers {
+function responseHeaders(origin: string | null, cacheStatus?: CacheStatus): Headers {
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
     'Referrer-Policy': 'no-referrer',
@@ -158,10 +181,15 @@ function responseHeaders(origin: string | null, cacheStatus?: 'HIT' | 'MISS'): H
     headers.set('Access-Control-Allow-Origin', origin)
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
     headers.set('Access-Control-Allow-Headers', 'Content-Type')
+    headers.set('Access-Control-Expose-Headers', 'X-Koipond-Cache, X-Koipond-Degraded, X-Koipond-Fetched-At')
     headers.set('Access-Control-Max-Age', '86400')
     headers.set('Vary', 'Origin')
   }
   if (cacheStatus) headers.set('X-Koipond-Cache', cacheStatus)
+  if (cacheStatus === 'STALE') {
+    headers.set('X-Koipond-Degraded', 'upstream')
+    headers.set('Warning', '110 - "Response is stale while GitHub recovers"')
+  }
   return headers
 }
 
@@ -169,7 +197,7 @@ function jsonResponse(
   data: unknown,
   status: number,
   origin: string | null,
-  cacheStatus?: 'HIT' | 'MISS',
+  cacheStatus?: CacheStatus,
 ): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -177,11 +205,25 @@ function jsonResponse(
   })
 }
 
-function withRequestHeaders(response: Response, origin: string | null, cacheStatus: 'HIT' | 'MISS'): Response {
+function withRequestHeaders(response: Response, origin: string | null, cacheStatus: CacheStatus): Response {
   const headers = new Headers(response.headers)
   const requestHeaders = responseHeaders(origin, cacheStatus)
   for (const [name, value] of requestHeaders) headers.set(name, value)
+  if (cacheStatus === 'STALE') headers.set('Cache-Control', 'no-store')
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
+function contributionCacheKeys(request: Request, canonicalUser: string) {
+  const requestURL = new URL(request.url)
+  const contributionPath = `/v1/contributions/${canonicalUser}`
+  return {
+    fresh: new Request(`${requestURL.origin}${contributionPath}`),
+    stale: new Request(`${requestURL.origin}/__cache/stale${contributionPath}`),
+  }
+}
+
+function transientFailure(error: unknown): boolean {
+  return !(error instanceof HTTPError) || error.status >= 500 || error.status === 429
 }
 
 async function contributionResponse(
@@ -192,23 +234,39 @@ async function contributionResponse(
   origin: string | null,
 ): Promise<Response> {
   const canonicalUser = username.toLowerCase()
-  const requestURL = new URL(request.url)
-  const cacheKey = new Request(`${requestURL.origin}/v1/contributions/${canonicalUser}`)
-  const cache = await caches.open('koi-almanac-contributions-v1')
-  const cached = await cache.match(cacheKey)
+  const cacheKeys = contributionCacheKeys(request, canonicalUser)
+  const cache = await caches.open('koi-almanac-contributions-v2')
+  const [cached, stale] = await Promise.all([cache.match(cacheKeys.fresh), cache.match(cacheKeys.stale)])
   if (cached) return withRequestHeaders(cached, origin, 'HIT')
 
   const rateLimit = await env.CONTRIBUTION_RATE_LIMIT.limit({ key: 'github-contribution-calendar' })
-  if (!rateLimit.success) return jsonResponse({ error: 'Contribution service is busy; retry shortly' }, 429, origin)
+  if (!rateLimit.success) {
+    return stale
+      ? withRequestHeaders(stale, origin, 'STALE')
+      : jsonResponse({ error: 'Contribution service is busy; retry shortly' }, 429, origin)
+  }
 
-  const contributions = await fetchContributions(username)
+  let contributions: ContributionDay[]
+  try {
+    contributions = await fetchContributions(username)
+  } catch (error) {
+    if (stale && transientFailure(error)) return withRequestHeaders(stale, origin, 'STALE')
+    throw error
+  }
+  const fetchedAt = new Date().toISOString()
   const response = jsonResponse(
-    { contributions, source: 'github.com/public-contribution-calendar' },
+    { contributions, source: 'github.com/public-contribution-calendar', fetchedAt },
     200,
     null,
   )
+  response.headers.set('X-Koipond-Fetched-At', fetchedAt)
   response.headers.set('Cache-Control', `public, max-age=300, s-maxage=${CACHE_TTL_SECONDS}`)
-  ctx.waitUntil(cache.put(cacheKey, response.clone()))
+  const staleResponse = response.clone()
+  staleResponse.headers.set('Cache-Control', `public, max-age=${STALE_CACHE_TTL_SECONDS}`)
+  ctx.waitUntil(Promise.all([
+    cache.put(cacheKeys.fresh, response.clone()),
+    cache.put(cacheKeys.stale, staleResponse),
+  ]))
   return withRequestHeaders(response, origin, 'MISS')
 }
 

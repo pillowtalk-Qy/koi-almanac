@@ -70,14 +70,49 @@ function fillInstall(user: string) {
 
 interface ApiResponse {
   contributions: { date: string; count: number; level: Day['level'] }[]
+  fetchedAt?: string
 }
 
-async function fetchGrid(user: string): Promise<Grid> {
-  const res = await fetch(`${CONTRIBUTION_API}/v1/contributions/${encodeURIComponent(user)}`)
-  if (!res.ok) throw new Error(res.status === 404 ? `User not found: ${user}` : `Contribution API responded ${res.status}`)
+interface GridResponse {
+  grid: Grid
+  stale: boolean
+  fetchedAt?: string
+}
+
+const retryableStatus = (statusCode: number) => statusCode === 429 || statusCode >= 500
+const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds))
+
+async function contributionRequest(user: string): Promise<Response> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(`${CONTRIBUTION_API}/v1/contributions/${encodeURIComponent(user)}`, {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!retryableStatus(response.status) || attempt === 2) return response
+      await response.body?.cancel()
+    } catch (error) {
+      lastError = error
+      if (attempt === 2) break
+    }
+    await wait(350 * 2 ** attempt)
+  }
+  throw lastError instanceof Error ? lastError : new Error('Contribution service unavailable')
+}
+
+async function fetchGrid(user: string): Promise<GridResponse> {
+  const res = await contributionRequest(user)
+  if (!res.ok) {
+    if (res.status === 404) throw new Error(`User not found: ${user}`)
+    throw new Error("GitHub's contribution service is temporarily unavailable after several retries. Please try again shortly.")
+  }
   const json = (await res.json()) as ApiResponse
   if (!json.contributions?.length) throw new Error(`No contributions found for ${user}`)
-  return gridFromDays(json.contributions)
+  return {
+    grid: gridFromDays(json.contributions),
+    stale: res.headers.get('X-Koipond-Cache') === 'STALE',
+    fetchedAt: res.headers.get('X-Koipond-Fetched-At') ?? json.fetchedAt,
+  }
 }
 
 type ViewMode = 'auto' | 'light' | 'dark'
@@ -186,10 +221,11 @@ function show(mode: ViewMode, animate = false) {
 
 async function generate(user: string) {
   button.disabled = true
+  status.removeAttribute('data-tone')
   status.textContent = 'Fetching contributions and simulating the pond...'
   result.hidden = true
   try {
-    const grid = await fetchGrid(user)
+    const { grid, stale, fetchedAt } = await fetchGrid(user)
     const p = plan(grid, user)
     currentGrid = grid
     currentPlan = p
@@ -197,12 +233,20 @@ async function generate(user: string) {
     svgs.light = renderSVG(grid, p, THEMES.light, user).svg
     svgs.dark = renderSVG(grid, p, THEMES.dark, user).svg
     renderAuto()
-    status.textContent = ''
+    if (stale) {
+      const snapshot = fetchedAt ? ` from ${new Date(fetchedAt).toLocaleString()}` : ''
+      status.dataset.tone = 'warning'
+      status.textContent = `GitHub is temporarily unavailable. Showing the last successful contribution snapshot${snapshot}.`
+    } else {
+      status.removeAttribute('data-tone')
+      status.textContent = ''
+    }
     result.hidden = false
     show(active)
     fillInstall(user)
     syncURL()
   } catch (err) {
+    status.dataset.tone = 'error'
     status.textContent = err instanceof Error ? err.message : String(err)
   } finally {
     button.disabled = false

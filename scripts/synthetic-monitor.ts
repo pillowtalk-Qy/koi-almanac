@@ -94,8 +94,12 @@ const contributions = await retrieve(
 if (contributions.response.headers.get('access-control-allow-origin') !== explorerURL.origin) {
   throw new Error('FAIL contribution calendar: production CORS origin changed')
 }
-if (!['HIT', 'MISS'].includes(contributions.response.headers.get('x-koipond-cache') ?? '')) {
+const cacheStatus = contributions.response.headers.get('x-koipond-cache') ?? ''
+if (!['HIT', 'MISS', 'STALE'].includes(cacheStatus)) {
   throw new Error('FAIL contribution calendar: edge cache status is missing')
+}
+if (cacheStatus === 'STALE' && contributions.response.headers.get('x-koipond-degraded') !== 'upstream') {
+  throw new Error('FAIL contribution calendar: stale response has no degraded-state marker')
 }
 const dayCount = validateContributions(JSON.parse(contributions.body))
 

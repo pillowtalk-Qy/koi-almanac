@@ -78,8 +78,10 @@ provenance is embedded in the SVG's `<metadata>` element.
 
 The online explorer reads only GitHub's public contribution calendar through this project's own
 Cloudflare Worker, rather than a third-party contribution API. The Worker sets no cookies, emits no
-application logs and stores no visitor identifiers; it keeps only a 15-minute edge cache of the public
-calendar response. Its source and runtime tests live in [`worker/`](worker/), and the production health
+application logs and stores no visitor identifiers. It keeps a 15-minute fresh edge cache of the public
+calendar plus a seven-day last-successful snapshot used only when GitHub is temporarily unavailable;
+stale responses are labeled in both HTTP headers and the explorer UI. Its source and runtime tests live
+in [`worker/`](worker/), and the production health
 endpoint is [`koi-almanac-contributions.intentflow-inspector.workers.dev/health`](https://koi-almanac-contributions.intentflow-inspector.workers.dev/health).
 
 A daily first-party synthetic monitor checks the explorer, Worker, one fixed public calendar, Profile SVG,

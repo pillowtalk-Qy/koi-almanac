@@ -176,6 +176,8 @@ try {
 
   await load(page, spring.svg)
   const springPlantSelector = '.spring-plant[data-plant-current]'
+  const springRootSelector = '[data-spring-root="0"]'
+  const springTipSelector = '.spring-tip[data-spring-tip="0-0"]'
   const springBubbleSelector = '.spring-bubble[data-spring-bubble="0"]'
   const springMotion = await page.$eval(springPlantSelector, element => ({
     direction: Number(element.getAttribute('data-plant-current')),
@@ -183,13 +185,23 @@ try {
     bubbles: document.querySelectorAll('.spring-bubble').length,
   }))
   await setProgress(page, [springPlantSelector], 0.2)
+  const springRootStart = await box(page, springRootSelector)
   const springPlantStart = await box(page, springPlantSelector)
   const springPlantStartState = await animationState(page, springPlantSelector)
   await setProgress(page, [springPlantSelector], 0.8)
   const springPlantWithCurrent = await box(page, springPlantSelector)
+  const springRootWithCurrent = await box(page, springRootSelector)
   const springPlantCurrentState = await animationState(page, springPlantSelector)
   const springPlantTravel = distance(springPlantStart, springPlantWithCurrent)
   const springPlantTravelX = springPlantWithCurrent.centerX - springPlantStart.centerX
+  const springRootTravel = distance(springRootStart, springRootWithCurrent)
+  await setProgress(page, [springPlantSelector], 0.55)
+  await setProgress(page, [springTipSelector], 0.2)
+  const springTipStart = await box(page, springTipSelector)
+  await setProgress(page, [springPlantSelector], 0.55)
+  await setProgress(page, [springTipSelector], 0.8)
+  const springTipWithCurrent = await box(page, springTipSelector)
+  const springTipTravel = distance(springTipStart, springTipWithCurrent)
   await setProgress(page, [springBubbleSelector], 0.18)
   const springBubbleStart = await box(page, springBubbleSelector)
   const springBubbleStartState = await animationState(page, springBubbleSelector)
@@ -204,6 +216,8 @@ try {
       JSON.stringify({ springPlantStart, springPlantWithCurrent, springPlantStartState, springPlantCurrentState }),
   )
   assert(Math.abs(springPlantTravelX) > 3, 'Spring plant sway no longer produces clearly visible lateral motion')
+  assert(springRootTravel < 0.1, `Spring plant root moved ${springRootTravel.toFixed(2)}px instead of staying anchored`)
+  assert(springTipTravel > 0.2, `Spring plant tip only moved ${springTipTravel.toFixed(2)}px; segmented lag is no longer visible`)
   assert(finiteBox(springBubbleStart) && finiteBox(springBubbleRisen), 'Spring bubble rise boxes are invalid')
   assert(
     springBubbleRise > 12,
@@ -216,6 +230,8 @@ try {
     ...springMotion,
     plantTravel: springPlantTravel,
     plantTravelX: springPlantTravelX,
+    rootTravel: springRootTravel,
+    tipTravel: springTipTravel,
     startState: springPlantStartState,
     currentState: springPlantCurrentState,
     bubbleRise: springBubbleRise,

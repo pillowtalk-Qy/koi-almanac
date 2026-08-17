@@ -53,16 +53,79 @@ describe('privacy-preserving contribution worker', () => {
     const response = await exports.default.fetch('https://api.example/v1/contributions/Example-User')
     expect(response.status).toBe(200)
     expect(response.headers.get('X-Koipond-Cache')).toBe('MISS')
+    expect(response.headers.get('X-Koipond-Fetched-At')).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     const body = await response.json<{
       contributions: { date: string; count: number; level: number }[]
       source: string
+      fetchedAt: string
     }>()
     expect(body.source).toBe('github.com/public-contribution-calendar')
+    expect(body.fetchedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(body.contributions).toEqual([
       { date: '2025-12-31', count: 1204, level: 4 },
       { date: '2026-01-01', count: 0, level: 0 },
     ])
     expect(upstream).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries transient GitHub failures before returning a fresh calendar', async () => {
+    const attempts = new Map<string, number>()
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(new Request(input).url)
+      const key = url.href
+      const attempt = (attempts.get(key) ?? 0) + 1
+      attempts.set(key, attempt)
+      if (attempt === 1) return new Response('temporarily unavailable', { status: 503 })
+      const previousYear = url.searchParams.get('from')?.startsWith('2025')
+      const html = previousYear
+        ? calendarHTML('2025-12-31', 3, '8 contributions on December 31st.')
+        : calendarHTML('2026-01-01', 1, '1 contribution on January 1st.')
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    })
+
+    const response = await exports.default.fetch('https://retry.example/v1/contributions/Retry-User')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('X-Koipond-Cache')).toBe('MISS')
+    expect(upstream).toHaveBeenCalledTimes(4)
+    expect([...attempts.values()]).toEqual([2, 2])
+  })
+
+  it('serves the last successful snapshot when GitHub remains unavailable', async () => {
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(new Request(input).url)
+      const previousYear = url.searchParams.get('from')?.startsWith('2025')
+      const html = previousYear
+        ? calendarHTML('2025-12-31', 2, '4 contributions on December 31st.')
+        : calendarHTML('2026-01-01', 0, 'No contributions on January 1st.')
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    })
+    const url = 'https://stale.example/v1/contributions/Stale-User'
+    const first = await exports.default.fetch(url)
+    expect(first.headers.get('X-Koipond-Cache')).toBe('MISS')
+
+    const cache = await caches.open('koi-almanac-contributions-v2')
+    const freshKey = new Request('https://stale.example/v1/contributions/stale-user')
+    const staleKey = new Request('https://stale.example/__cache/stale/v1/contributions/stale-user')
+    await vi.waitFor(async () => {
+      expect(await cache.match(staleKey)).toBeDefined()
+    })
+    await cache.delete(freshKey)
+    upstream.mockResolvedValue(new Response('temporarily unavailable', { status: 503 }))
+
+    const response = await exports.default.fetch(new Request(url, {
+      headers: { Origin: 'https://pillowtalk-qy.github.io' },
+    }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('X-Koipond-Cache')).toBe('STALE')
+    expect(response.headers.get('X-Koipond-Degraded')).toBe('upstream')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('X-Koipond-Cache')
+    const body = await response.json<{
+      contributions: { date: string; count: number; level: number }[]
+      fetchedAt: string
+    }>()
+    expect(body.contributions).toHaveLength(2)
+    expect(body.fetchedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
   it('does not grant CORS access to unrelated sites', async () => {

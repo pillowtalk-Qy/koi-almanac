@@ -143,6 +143,10 @@
 
   #status { margin: 10px 0 0; min-height: 1.4em; color: var(--muted); font-family: var(--mono); font-size: 13px; }
   #status:not(:empty)::before { content: "≈ "; color: var(--accent); }
+  #status[data-tone="warning"] { color: #d5c77a; }
+  #status[data-tone="warning"]::before { color: #f2d86f; }
+  #status[data-tone="error"] { color: #f0a1a1; }
+  #status[data-tone="error"]::before { color: #fb7185; }
 
   #result { display: grid; gap: 16px; animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
   #result[hidden] { display: none; }
