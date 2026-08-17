@@ -538,6 +538,7 @@ export function renderSVG(
 .bloom{transform-box:fill-box;transform-origin:center;animation:bloom 5.2s ease-in-out infinite alternate}
 .lotus-bud{transform-box:fill-box;transform-origin:center;animation:lotus-bud 4.8s ease-in-out infinite alternate}
 .summer-lotus-bud{transform-box:fill-box;transform-origin:center;animation:summer-lotus-bud 5.4s ease-in-out infinite alternate}
+.summer-lotus-drift{transform-box:fill-box;transform-origin:center;animation-name:summer-lotus-drift;animation-timing-function:cubic-bezier(.42,.08,.58,.92);animation-iteration-count:infinite}
 .firefly-flight{animation-name:firefly-flight;animation-timing-function:linear;animation-iteration-count:infinite}
 .firefly-glow{transform-box:fill-box;transform-origin:center;animation-name:firefly-glow;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 .lotus-visit{transform-box:fill-box;transform-origin:center;animation-name:lotus-visit;animation-timing-function:ease-out;animation-iteration-count:infinite}
@@ -565,9 +566,10 @@ export function renderSVG(
 @keyframes tw{from{opacity:0.06}to{opacity:0.26}}
 @keyframes ray{from{opacity:${rayFloor.toFixed(3)}}to{opacity:${rayPeak.toFixed(3)}}}
 @keyframes sway{from{transform:rotate(${(swayBias - swayAngle).toFixed(1)}deg)}to{transform:rotate(${(swayBias + swayAngle).toFixed(1)}deg)}}
-@keyframes bloom{from{transform:scale(1)}to{transform:scale(1.07)}}
+@keyframes bloom{from{transform:scale(1)}to{transform:scale(1.04)}}
 @keyframes lotus-bud{from{transform:translateY(0) rotate(-2deg)}to{transform:translateY(-0.5px) rotate(2deg)}}
 @keyframes summer-lotus-bud{from{transform:scale(0.99)}to{transform:scale(1.01)}}
+@keyframes summer-lotus-drift{0%,100%{transform:translate(var(--lotus-x0),var(--lotus-y0)) rotate(var(--lotus-r0))}43%{transform:translate(var(--lotus-x1),var(--lotus-y1)) rotate(var(--lotus-r1))}72%{transform:translate(var(--lotus-x2),var(--lotus-y2)) rotate(var(--lotus-r2))}}
 @keyframes firefly-flight{0%,100%{transform:translate(0,0)}29%{transform:translate(var(--ffx1),var(--ffy1))}64%{transform:translate(var(--ffx2),var(--ffy2))}82%{transform:translate(var(--ffx3),var(--ffy3))}}
 @keyframes firefly-glow{0%,100%{transform:scale(0.76);opacity:0.34}28%{transform:scale(1.06);opacity:1}52%{transform:scale(0.82);opacity:0.4}76%{transform:scale(1);opacity:0.9}}
 @keyframes lotus-visit{0%,54%,100%{transform:scale(0.35);opacity:0}62%{transform:scale(0.72);opacity:0.32}76%{transform:scale(1.45);opacity:0}}
@@ -612,10 +614,7 @@ ${turtleScene.css}
     ? `<metadata id="koipond-environment">${escapeXML(JSON.stringify(context.environment))}</metadata>`
     : ''
   const lotusPresence = environment?.bloom ?? 1
-  const naturalLotusOpenness = environment?.lotusOpenness ?? 1
-  const lotusOpenness = environment?.season === 'summer'
-    ? Math.max(naturalLotusOpenness, 0.56 + environment.nightDepth * 0.24)
-    : naturalLotusOpenness
+  const lotusOpenness = environment?.lotusOpenness ?? 1
   const environmentDescription = context.environment
     ? ` It is ${context.environment.phase} in ${context.environment.season}.`
     : ''
@@ -675,14 +674,31 @@ ${turtleScene.css}
     `<rect width="${width}" height="${LAYOUT.height}" rx="10" fill="url(#vig)"/>` +
     surfaceSheen(width, theme, sheenIntensity) +
     lilyPads(width, theme, seed, environment?.plantCoverage ?? 1) +
-    summerBlooms(width, theme, seed, environment?.summerBloom ?? 0, lotusOpenness) +
+    summerBlooms(
+      width,
+      theme,
+      seed,
+      environment?.summerBloom ?? 0,
+      lotusOpenness,
+      currentDirection,
+      currentStrength,
+      environment?.surfaceActivity ?? 1,
+      environment?.daylight ?? 1,
+    ) +
     (hasLotus && lotusPresence >= 0.35
       ? `<g opacity="${lotusPresence.toFixed(3)}">${lotus(
           lotusX,
           theme,
           r,
           lotusOpenness,
-          environment?.season === 'summer' && lotusOpenness < 0.72,
+          environment?.season === 'summer'
+            ? {
+                currentDirection,
+                currentStrength,
+                surfaceActivity: environment.surfaceActivity,
+                daylight: environment.daylight,
+              }
+            : undefined,
         )}</g>`
       : '') +
     plan.fishes.map(f => `<g>${fishSVG(f, theme, staticTime, timelineDuration, animationDuration)}</g>`).join('') +

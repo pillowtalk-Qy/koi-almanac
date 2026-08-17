@@ -78,6 +78,57 @@ try {
 
   if (digests.size !== scenes.length) throw new Error('One or more README environments rendered identically')
 
+  const summerDayIndex = scenes.findIndex(scene => scene.season === 'summer' && scene.phase === 'day')
+  const summerNightIndex = scenes.findIndex(scene => scene.season === 'summer' && scene.phase === 'night')
+  const summerDayTime = (summerDayIndex * slotSeconds + slotSeconds / 2) * 1000
+  await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), summerDayTime)
+  const lotusSelector =
+    `.readme-demo-scene-${summerDayIndex} .rd${summerDayIndex}-summer-lotus-drift[data-lotus-motion="current-drift"]`
+  const lotusMotion = await page.$eval(lotusSelector, element => ({
+    direction: Number(element.getAttribute('data-lotus-current')),
+    amplitude: Number(element.getAttribute('data-lotus-drift-x')),
+  }))
+  const seekLotus = async (progress: number) => {
+    return await page.$eval(lotusSelector, (element, value) => {
+      const animation = element.getAnimations()[0]
+      if (!animation) throw new Error('README summer lotus has no native animation')
+      const timing = animation.effect?.getTiming()
+      const duration = Number(timing?.duration)
+      const delay = Number(timing?.delay ?? 0)
+      let currentTime = delay + duration * value
+      while (currentTime < 0) currentTime += duration
+      animation.currentTime = currentTime
+      const rect = element.getBoundingClientRect()
+      return { centerX: rect.x + rect.width / 2, centerY: rect.y + rect.height / 2 }
+    }, progress)
+  }
+  const lotusStart = await seekLotus(0)
+  const lotusWithCurrent = await seekLotus(0.72)
+  const lotusTravelX = lotusWithCurrent.centerX - lotusStart.centerX
+  const lotusTravel = Math.hypot(lotusTravelX, lotusWithCurrent.centerY - lotusStart.centerY)
+  if (lotusTravel <= 2 || lotusTravel >= 7 || Math.sign(lotusTravelX) !== lotusMotion.direction) {
+    throw new Error(`README summer lotus motion is invalid: ${JSON.stringify({ lotusMotion, lotusTravel, lotusTravelX })}`)
+  }
+
+  const summerNightTime = (summerNightIndex * slotSeconds + slotSeconds / 2) * 1000
+  await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), summerNightTime)
+  const nightLotus = await page.$eval(`.readme-demo-scene-${summerNightIndex}`, (scene, prefix) => {
+    const sleeping = scene.querySelectorAll('[data-lotus-state="sleeping"][data-lotus-openness="0.120"]').length
+    const buds = scene.querySelectorAll('[data-lotus-form="closed-bud"]').length
+    const openStage = scene.querySelector(`.${prefix}-lotus-open-stage`)
+    const bud = scene.querySelector(`.${prefix}-summer-lotus-bud`)
+    return {
+      sleeping,
+      buds,
+      openOpacity: openStage ? Number(getComputedStyle(openStage).opacity) : 1,
+      budOpacity: bud ? Number(getComputedStyle(bud).opacity) : 0,
+    }
+  }, `rd${summerNightIndex}`)
+  if (nightLotus.sleeping < 3 || nightLotus.buds < 3 || nightLotus.openOpacity > 0.02 || nightLotus.budOpacity < 0.75) {
+    throw new Error(`README summer night lotus is not closed: ${JSON.stringify(nightLotus)}`)
+  }
+  const lotus = { ...lotusMotion, travel: lotusTravel, travelX: lotusTravelX, night: nightLotus }
+
   const transitionTime = (slotSeconds - README_DEMO_TRANSITION_SECONDS / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), transitionTime)
   const transitionOpacities = await page.$$eval('.readme-demo-scene', elements =>
@@ -117,11 +168,11 @@ try {
 
   writeFileSync(
     join(outputDirectory, 'report.json'),
-    JSON.stringify({ scenes: report, transitionOpacities, transformBefore, transformAfter, motionDelta }, null, 2) + '\n',
+    JSON.stringify({ scenes: report, lotus, transitionOpacities, transformBefore, transformAfter, motionDelta }, null, 2) + '\n',
   )
   console.log(
     `${scenes.length} native environments verified across ${README_DEMO_LOOP_SECONDS}s; ` +
-    `fish moved; motion delta ${motionDelta.toFixed(3)}`,
+    `lotus drifted ${lotusTravel.toFixed(2)}px; fish moved; motion delta ${motionDelta.toFixed(3)}`,
   )
 } finally {
   await browser.close()

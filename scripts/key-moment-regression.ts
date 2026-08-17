@@ -117,14 +117,23 @@ async function capture(page: Page, name: string) {
 rmSync(outputDirectory, { recursive: true, force: true })
 mkdirSync(outputDirectory, { recursive: true })
 
-const summerEnvironment = deriveEnvironment(momentFromText('2026-08-16', '00:00'), 'summer')
-const summerPlan = plan(grid, 'key-moment-regression', undefined, summerEnvironment)
-const summer = renderSVG(
+const summerDayEnvironment = deriveEnvironment(momentFromText('2026-08-16', '12:00'), 'summer')
+const summerDayPlan = plan(grid, 'key-moment-regression', undefined, summerDayEnvironment)
+const summerDay = renderSVG(
   grid,
-  summerPlan,
-  themeForEnvironment(summerEnvironment),
+  summerDayPlan,
+  themeForEnvironment(summerDayEnvironment),
   'key-moment-regression',
-  { environment: summerEnvironment },
+  { environment: summerDayEnvironment },
+)
+const summerNightEnvironment = deriveEnvironment(momentFromText('2026-08-16', '00:00'), 'summer')
+const summerNightPlan = plan(grid, 'key-moment-regression', undefined, summerNightEnvironment)
+const summerNight = renderSVG(
+  grid,
+  summerNightPlan,
+  themeForEnvironment(summerNightEnvironment),
+  'key-moment-regression',
+  { environment: summerNightEnvironment },
 )
 const winterEnvironment = deriveEnvironment(momentFromText('2026-01-15', '00:00'), 'winter')
 const winterPlan = plan(grid, 'key-moment-regression', undefined, winterEnvironment)
@@ -146,7 +155,25 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage()
 
-  await load(page, summer.svg)
+  await load(page, summerDay.svg)
+  const lotusSelector = '.summer-lotus-drift[data-lotus-motion="current-drift"]'
+  const lotusMotion = await page.$eval(lotusSelector, element => ({
+    direction: Number(element.getAttribute('data-lotus-current')),
+    amplitude: Number(element.getAttribute('data-lotus-drift-x')),
+  }))
+  await setProgress(page, [lotusSelector], 0)
+  const lotusStart = await box(page, lotusSelector)
+  await setProgress(page, [lotusSelector], 0.72)
+  const lotusWithCurrent = await box(page, lotusSelector)
+  const lotusTravel = distance(lotusStart, lotusWithCurrent)
+  const lotusTravelX = lotusWithCurrent.centerX - lotusStart.centerX
+  assert(finiteBox(lotusStart) && finiteBox(lotusWithCurrent), 'Summer lotus drift boxes are invalid')
+  assert(lotusTravel > 2 && lotusTravel < 7, `Summer lotus drift is ${lotusTravel.toFixed(2)}px instead of a restrained float`)
+  assert(Math.sign(lotusTravelX) === lotusMotion.direction, 'Summer lotus drift no longer follows the water current')
+  await capture(page, 'summer-lotus-drift')
+  report.lotus = { ...lotusMotion, travel: lotusTravel, travelX: lotusTravelX }
+
+  await load(page, summerNight.svg)
   const fireflyIndex = await page.$eval(
     '.firefly-flight[data-firefly-role="lotus-visitor"]',
     element => element.getAttribute('data-firefly-index'),
@@ -264,4 +291,4 @@ try {
 }
 
 writeFileSync(join(outputDirectory, 'report.json'), JSON.stringify(report, null, 2) + '\n')
-console.log(`${outputDirectory}/report.json  firefly, snow, turtle and fish seam key moments verified`)
+console.log(`${outputDirectory}/report.json  lotus, firefly, snow, turtle and fish seam key moments verified`)

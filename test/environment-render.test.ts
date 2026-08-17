@@ -52,6 +52,9 @@ describe('environment-aware original renderer', () => {
     expect(summerSvg).toContain('data-seasonal-part="summer-bloom"')
     expect(summerSvg).toContain('data-lotus-state="open"')
     expect(summerSvg.match(/data-lotus-openness=/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(summerSvg.match(/data-lotus-motion="current-drift"/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(summerSvg).toContain('data-lotus-drift-x=')
+    expect(summerSvg).toContain('@keyframes summer-lotus-drift{')
     expect(summerSvg).not.toContain('data-seasonal-part="summer-fireflies"')
     expect(autumnSvg).toContain('data-seasonal-part="autumn-maple"')
     expect(autumnSvg).toContain('class="maple-wake"')
@@ -144,8 +147,9 @@ describe('environment-aware original renderer', () => {
     expect(renders[1]).toContain('data-firefly-index="0"')
     expect(renders[1].match(/class="lotus-visit"/g)?.length).toBeGreaterThanOrEqual(5)
     expect(renders[1]).toContain('@keyframes lotus-visit{')
-    expect(renders[1]).toContain('data-lotus-state="open"')
-    expect(renders[1]).toContain('data-lotus-openness="0.800"')
+    expect(renders[1]).toContain('data-lotus-state="sleeping"')
+    expect(renders[1]).toContain('data-lotus-openness="0.120"')
+    expect(renders[1].match(/data-lotus-form="closed-bud"/g)?.length).toBeGreaterThanOrEqual(3)
     expect(renders[2]).toContain('data-seasonal-part="autumn-maple"')
     expect(renders[3]).toContain('data-seasonal-part="winter-ice"')
     expect(renders[3]).toContain('data-seasonal-part="winter-snowfall"')
@@ -205,6 +209,26 @@ describe('environment-aware original renderer', () => {
     expect(currentRule(eastSvg)).not.toBe(currentRule(westSvg))
     expect(variable(firstLeaf(eastSvg), 'mx0')).toBeLessThan(variable(firstLeaf(eastSvg), 'mx3'))
     expect(variable(firstLeaf(westSvg), 'mx0')).toBeGreaterThan(variable(firstLeaf(westSvg), 'mx3'))
+  })
+
+  it('floats summer lotus flowers with the water current and calms them at night', () => {
+    const eastward = deriveEnvironment(momentFromText('2026-08-16', '12:00', 0, 0, 0), 'summer')
+    const westward = deriveEnvironment(momentFromText('2026-08-22', '12:00', 0, 0, 0), 'summer')
+    const night = deriveEnvironment(momentFromText('2026-08-16', '00:00', 0, 0, 0), 'summer')
+    const eastSvg = renderSVG(grid, pondPlan, themeForEnvironment(eastward), 'seasonal-render', { environment: eastward }).svg
+    const westSvg = renderSVG(grid, pondPlan, themeForEnvironment(westward), 'seasonal-render', { environment: westward }).svg
+    const nightSvg = renderSVG(grid, pondPlan, themeForEnvironment(night), 'seasonal-render', { environment: night }).svg
+    const firstDrift = (svg: string) => svg.match(/class="summer-lotus-drift"[^>]+/)?.[0] ?? ''
+    const variable = (attributes: string, name: string) => Number(attributes.match(new RegExp(`--lotus-${name}:([-\\d.]+)px`))?.[1])
+    const amplitude = (attributes: string) => Number(attributes.match(/data-lotus-drift-x="([\d.]+)"/)?.[1])
+
+    expect(eastward.currentDirection).toBeGreaterThan(0)
+    expect(westward.currentDirection).toBeLessThan(0)
+    expect(firstDrift(eastSvg)).toContain('data-lotus-current="1"')
+    expect(firstDrift(westSvg)).toContain('data-lotus-current="-1"')
+    expect(variable(firstDrift(eastSvg), 'x0')).toBeLessThan(variable(firstDrift(eastSvg), 'x2'))
+    expect(variable(firstDrift(westSvg), 'x0')).toBeGreaterThan(variable(firstDrift(westSvg), 'x2'))
+    expect(amplitude(firstDrift(eastSvg))).toBeGreaterThan(amplitude(firstDrift(nightSvg)) * 2)
   })
 
   it('starts complete fish bodies and keeps the loop seam closed by day and night', () => {

@@ -201,54 +201,128 @@ function lotusState(openness: number) {
   return openness >= 0.72 ? 'open' : openness >= 0.3 ? 'opening' : 'sleeping'
 }
 
-function closedLotusBud(theme: Theme, radius: number): string {
-  const outerX = f1(radius)
-  const outerY = f1(radius * 0.72)
-  const petalX = f1(radius * 0.29)
-  const petalY = f1(radius * 0.58)
-  const side = f1(radius * 0.27)
+function lotusPetal(radius: number, halfWidth: number): string {
   return (
-    `<ellipse cx="${f1(radius * 0.12)}" cy="${f1(radius * 0.18)}" rx="${f1(radius * 1.04)}" ry="${f1(radius * 0.76)}" fill="rgba(0,20,25,0.14)"/>` +
-    `<ellipse rx="${outerX}" ry="${outerY}" fill="${theme.lotusOuter}" opacity="0.58" ` +
-    `stroke="${theme.lotusInner}" stroke-width="0.55" stroke-opacity="0.32"/>` +
-    `<ellipse cx="-${side}" rx="${petalX}" ry="${petalY}" transform="rotate(-14 -${side} 0)" fill="${theme.lotusOuter}" opacity="0.72"/>` +
-    `<ellipse rx="${petalX}" ry="${f1(radius * 0.63)}" fill="${theme.lotusInner}" opacity="0.82"/>` +
-    `<ellipse cx="${side}" rx="${petalX}" ry="${petalY}" transform="rotate(14 ${side} 0)" fill="${theme.lotusOuter}" opacity="0.72"/>`
+    `M-${f1(radius * 0.06)} 0 ` +
+    `C${f1(radius * 0.16)} -${f1(halfWidth)} ${f1(radius * 0.62)} -${f1(halfWidth * 0.95)} ${f1(radius * 0.86)} -${f1(halfWidth * 0.36)} ` +
+    `C${f1(radius * 1.02)} -${f1(halfWidth * 0.12)} ${f1(radius * 1.02)} ${f1(halfWidth * 0.12)} ${f1(radius * 0.86)} ${f1(halfWidth * 0.36)} ` +
+    `C${f1(radius * 0.62)} ${f1(halfWidth * 0.95)} ${f1(radius * 0.16)} ${f1(halfWidth)} -${f1(radius * 0.06)} 0 Z`
+  )
+}
+
+function openLotus(theme: Theme, radius: number, delay = 0): string {
+  const outerAngles = [-2, 34, 70, 106, 142, 178, 214, 250, 286, 322]
+  const innerAngles = [17, 68, 120, 171, 223, 274, 326]
+  const outerPath = lotusPetal(radius, radius * 0.36)
+  const innerPath = lotusPetal(radius * 0.72, radius * 0.3)
+  const outer = outerAngles
+    .map((angle, index) =>
+      `<path d="${outerPath}" transform="rotate(${angle})" fill="${theme.lotusOuter}" ` +
+      `opacity="${index % 2 === 0 ? '0.92' : '0.86'}" stroke="${theme.lotusInner}" stroke-width="0.2" stroke-opacity="0.42"/>`,
+    )
+    .join('')
+  const inner = innerAngles
+    .map((angle, index) =>
+      `<path d="${innerPath}" transform="rotate(${angle})" fill="${theme.lotusInner}" ` +
+      `opacity="${index % 2 === 0 ? '0.98' : '0.9'}"/>`,
+    )
+    .join('')
+  const heartRadius = radius * 0.19
+  const stamens = Array.from({ length: 6 }, (_, index) => {
+    const angle = (index / 6) * Math.PI * 2
+    return `<circle cx="${f1(Math.cos(angle) * heartRadius)}" cy="${f1(Math.sin(angle) * heartRadius)}" r="${f1(radius * 0.06)}" fill="${theme.lotusHeart}"/>`
+  }).join('')
+  return (
+    `<g class="bloom lotus-bloom" style="animation-delay:-${f1(delay)}s">` +
+    outer + inner +
+    `<circle r="${f1(radius * 0.22)}" fill="${theme.lotusHeart}" opacity="0.94"/>` +
+    `<circle r="${f1(radius * 0.08)}" fill="${theme.lotusInner}" opacity="0.62"/>` +
+    stamens +
+    `</g>`
+  )
+}
+
+function closedLotusBud(theme: Theme, radius: number): string {
+  const outer =
+    `M0 -${f1(radius)} ` +
+    `C${f1(radius * 0.72)} -${f1(radius * 0.55)} ${f1(radius * 0.82)} ${f1(radius * 0.36)} 0 ${f1(radius * 0.82)} ` +
+    `C-${f1(radius * 0.82)} ${f1(radius * 0.36)} -${f1(radius * 0.72)} -${f1(radius * 0.55)} 0 -${f1(radius)} Z`
+  const left =
+    `M-${f1(radius * 0.08)} -${f1(radius * 0.78)} ` +
+    `C-${f1(radius * 0.7)} -${f1(radius * 0.26)} -${f1(radius * 0.58)} ${f1(radius * 0.36)} 0 ${f1(radius * 0.7)} ` +
+    `C-${f1(radius * 0.08)} ${f1(radius * 0.16)} -${f1(radius * 0.18)} -${f1(radius * 0.26)} -${f1(radius * 0.08)} -${f1(radius * 0.78)} Z`
+  return (
+    `<ellipse cx="${f1(radius * 0.13)}" cy="${f1(radius * 0.28)}" rx="${f1(radius * 0.88)}" ry="${f1(radius * 0.73)}" fill="rgba(0,20,25,0.14)"/>` +
+    `<path d="${outer}" fill="${theme.lotusOuter}" opacity="0.82" stroke="${theme.lotusInner}" stroke-width="0.38" stroke-opacity="0.42"/>` +
+    `<path d="${left}" fill="${theme.lotusInner}" opacity="0.84"/>` +
+    `<path d="${left}" fill="${theme.lotusOuter}" opacity="0.7" transform="scale(-1 1)"/>` +
+    `<path d="M0 -${f1(radius * 0.7)} C${f1(radius * 0.2)} -${f1(radius * 0.2)} ${f1(radius * 0.18)} ${f1(radius * 0.34)} 0 ${f1(radius * 0.62)}" ` +
+    `fill="none" stroke="${theme.lotusInner}" stroke-width="${f1(Math.max(0.42, radius * 0.1))}" stroke-linecap="round" opacity="0.9"/>` +
+    `<ellipse cx="-${f1(radius * 0.2)}" cy="-${f1(radius * 0.34)}" rx="${f1(radius * 0.13)}" ry="${f1(radius * 0.3)}" fill="${theme.lotusInner}" opacity="0.48" transform="rotate(20)"/>`
   )
 }
 
 function smallLotus(theme: Theme, scale: number, delay: number, openness: number): string {
   const open = clamp01(openness)
-  const openOpacity = clamp01((open - 0.16) / 0.72)
-  const budOpacity = 1 - clamp01((open - 0.34) / 0.5)
-  const openScaleX = 0.42 + open * 0.58
-  const openScaleY = 0.24 + open * 0.76
-  let petals = ''
-  for (let index = 0; index < 7; index++) {
-    petals += `<ellipse rx="5.2" ry="2" transform="rotate(${index * (360 / 7)})" fill="${theme.lotusOuter}"/>`
-  }
-  let inner = ''
-  for (let index = 0; index < 5; index++) {
-    inner += `<ellipse rx="3.2" ry="1.35" transform="rotate(${18 + index * 72})" fill="${theme.lotusInner}"/>`
-  }
+  const openOpacity = clamp01((open - 0.18) / 0.55)
+  const budOpacity = 1 - clamp01((open - 0.22) / 0.55)
+  const openScaleX = 0.56 + open * 0.44
+  const openScaleY = 0.46 + open * 0.54
   return (
     `<g data-lotus-state="${lotusState(open)}" data-lotus-openness="${open.toFixed(3)}" transform="scale(${f1(scale)})">` +
-    `<ellipse cx="1.8" cy="2.5" rx="7.2" ry="6" fill="rgba(0,20,25,0.18)"/>` +
+    `<ellipse class="lotus-water-shadow" cx="1.4" cy="2.2" rx="7.4" ry="5.2" fill="rgba(0,20,25,0.16)"/>` +
+    `<ellipse class="lotus-waterline" rx="7.8" ry="3.7" fill="none" stroke="${theme.lilyLight}" stroke-width="0.55" opacity="0.5"/>` +
     `<g class="lotus-open-stage" opacity="${openOpacity.toFixed(3)}" transform="scale(${f1(openScaleX)} ${f1(openScaleY)})">` +
-    `<g class="bloom" style="animation-delay:-${f1(delay)}s">${petals}${inner}<circle r="1.7" fill="${theme.lotusHeart}"/></g></g>` +
+    openLotus(theme, 8, delay) +
+    `</g>` +
     `<g class="summer-lotus-bud" data-lotus-form="closed-bud" opacity="${(budOpacity * 0.82).toFixed(3)}" style="animation-delay:-${f1(delay * 0.6)}s">` +
-    closedLotusBud(theme, 4.2) +
+    closedLotusBud(theme, 4.6) +
     `</g>` +
     `</g>`
+  )
+}
+
+interface LotusDrift {
+  currentDirection: number
+  currentStrength: number
+  surfaceActivity: number
+  daylight: number
+  index: number
+}
+
+function lotusDriftAttributes(motion: LotusDrift): string {
+  const direction = motion.currentDirection < 0 ? -1 : 1
+  const strength = clamp01(motion.currentStrength)
+  const surface = clamp01(motion.surfaceActivity)
+  const daylight = clamp01(motion.daylight)
+  const daylightFactor = 0.34 + daylight * 0.66
+  const amplitude = (2.2 + strength * 2.4) * (0.74 + surface * 0.26) * daylightFactor
+  const vertical = (0.7 + surface * 0.9) * (0.52 + daylight * 0.48)
+  const x0 = -direction * amplitude * 0.38
+  const x1 = direction * amplitude * 0.2
+  const x2 = direction * amplitude
+  const y0 = -vertical * (motion.index % 2 === 0 ? 0.28 : 0.12)
+  const y1 = vertical * (motion.index % 2 === 0 ? 0.74 : 1)
+  const y2 = -vertical * (motion.index % 2 === 0 ? 0.44 : 0.62)
+  const tilt = direction * (0.65 + surface * 0.65)
+  const duration = 12.5 + motion.index * 1.8 + (1 - strength) * 3.4
+  const delay = 1.3 + motion.index * 3.1
+  return (
+    `class="summer-lotus-drift" data-lotus-motion="current-drift" ` +
+    `data-lotus-current="${direction}" data-lotus-drift-x="${amplitude.toFixed(2)}" ` +
+    `style="--lotus-x0:${f1(x0)}px;--lotus-y0:${f1(y0)}px;--lotus-r0:${f1(-tilt * 0.6)}deg;` +
+    `--lotus-x1:${f1(x1)}px;--lotus-y1:${f1(y1)}px;--lotus-r1:${f1(tilt * 0.15)}deg;` +
+    `--lotus-x2:${f1(x2)}px;--lotus-y2:${f1(y2)}px;--lotus-r2:${f1(tilt)}deg;` +
+    `animation-duration:${f1(duration)}s;animation-delay:-${f1(delay)}s"`
   )
 }
 
 function summerBloomSites(width: number, seed: string) {
   const pads = lilyPadLayout(width, seed)
   return [
-    { x: pads[0].x + 1, y: pads[0].y - 2, scale: 0.72 },
-    { x: pads[1].x + 2, y: pads[1].y - 2, scale: 0.66 },
-    { x: pads[2].x - 4, y: pads[2].y + 1, scale: 0.96 },
+    { x: pads[0].x + 1, y: pads[0].y - 2, scale: 0.82 },
+    { x: pads[1].x + 2, y: pads[1].y - 2, scale: 0.8 },
+    { x: pads[2].x - 4, y: pads[2].y + 1, scale: 1.04 },
   ]
 }
 
@@ -258,11 +332,18 @@ export function summerBlooms(
   seed: string,
   intensity: number,
   openness = 1,
+  currentDirection = 1,
+  currentStrength = 0.5,
+  surfaceActivity = 1,
+  daylight = 1,
 ): string {
   if (intensity < 0.08) return ''
   const blooms = summerBloomSites(width, seed)
     .map(({ x, y, scale }, index) =>
-      `<g transform="translate(${f1(x)} ${f1(y)})">${smallLotus(theme, scale, index * 1.7, openness)}</g>`,
+      `<g transform="translate(${f1(x)} ${f1(y)})">` +
+      `<g ${lotusDriftAttributes({ currentDirection, currentStrength, surfaceActivity, daylight, index })}>` +
+      smallLotus(theme, scale, index * 1.7, openness) +
+      `</g></g>`,
     )
     .join('')
   return `<g data-seasonal-part="summer-bloom" opacity="${f1(Math.min(1, intensity * 0.94))}">${blooms}</g>`
@@ -481,41 +562,32 @@ export function lotus(
   theme: Theme,
   r: () => number,
   openness = 1,
-  compactNightBloom = false,
+  motion?: Omit<LotusDrift, 'index'>,
 ): string {
   const y = 24 + r() * 6
   const open = clamp01(openness)
-  const openOpacity = clamp01((open - 0.16) / 0.72)
-  const budOpacity = 1 - clamp01((open - 0.34) / 0.5)
-  const openScaleX = 0.42 + open * 0.58
-  const openScaleY = 0.24 + open * 0.76
-  let petals = ''
-  for (let k = 0; k < 8; k++) {
-    petals += `<ellipse rx="7" ry="2.9" transform="rotate(${k * 45})" fill="${theme.lotusOuter}"/>`
-  }
-  let inner = ''
-  for (let k = 0; k < 5; k++) {
-    inner += `<ellipse rx="4.6" ry="2" transform="rotate(${22 + k * 72})" fill="${theme.lotusInner}"/>`
-  }
-  const closedStage = compactNightBloom
-    ? `<g class="summer-lotus-bud" data-lotus-form="closed-bud" opacity="${(budOpacity * 0.78).toFixed(3)}">` +
-      closedLotusBud(theme, 5.8) +
-      `</g>`
-    : `<g class="lotus-bud" opacity="${budOpacity.toFixed(3)}">` +
-      `<ellipse rx="3.5" ry="8" fill="${theme.lotusOuter}"/>` +
-      `<ellipse rx="2.8" ry="7" transform="rotate(25)" fill="${theme.lotusInner}"/>` +
-      `<ellipse rx="2.8" ry="7" transform="rotate(-25)" fill="${theme.lotusOuter}"/>` +
-      `</g>`
-  return (
-    `<g transform="translate(${f1(x)} ${f1(y)})">` +
+  const openOpacity = clamp01((open - 0.18) / 0.55)
+  const budOpacity = 1 - clamp01((open - 0.22) / 0.55)
+  const openScaleX = 0.56 + open * 0.44
+  const openScaleY = 0.46 + open * 0.54
+  const pondLotus =
     `<ellipse cx="2.5" cy="3.5" rx="13" ry="12" fill="rgba(0,20,25,0.2)"/>` +
     `<circle r="12.5" fill="${theme.lily}" opacity="0.9"/>` +
     `<circle r="12.5" fill="none" stroke="${theme.lilyLight}" stroke-width="1.4" opacity="0.8"/>` +
     `<g data-lotus-state="${lotusState(open)}" data-lotus-openness="${open.toFixed(3)}">` +
     `<g class="lotus-open-stage" opacity="${openOpacity.toFixed(3)}" transform="scale(${f1(openScaleX)} ${f1(openScaleY)})">` +
-    `<g class="bloom">${petals}${inner}<circle r="2.3" fill="${theme.lotusHeart}"/></g></g>` +
-    closedStage +
+    openLotus(theme, 8.2) +
     `</g>` +
+    `<g class="lotus-bud" data-lotus-form="closed-bud" opacity="${budOpacity.toFixed(3)}">` +
+    closedLotusBud(theme, 6) +
+    `</g>` +
+    `</g>`
+  const floatingLotus = motion
+    ? `<g ${lotusDriftAttributes({ ...motion, index: 3 })}>${pondLotus}</g>`
+    : pondLotus
+  return (
+    `<g transform="translate(${f1(x)} ${f1(y)})">` +
+    floatingLotus +
     `</g>`
   )
 }
