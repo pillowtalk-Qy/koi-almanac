@@ -103,6 +103,8 @@ try {
   ) {
     throw new Error(`Showcase crossfade is not balanced: ${transitionOpacities.join(', ')}`)
   }
+  const transitionCapture = await page.screenshot({ type: 'png', omitBackground: true }) as Buffer
+  writeFileSync(join(outputDirectory, 'transition-spring-to-summer.png'), transitionCapture)
 
   const motionTime = (slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), motionTime)
@@ -114,11 +116,12 @@ try {
 
   writeFileSync(
     join(outputDirectory, 'report.json'),
-    JSON.stringify({ scenes: report, transitionOpacities, motionDelta }, null, 2) + '\n',
+    JSON.stringify({ scenes: report, transitionOpacities, sharedFishTimeline: true, motionDelta }, null, 2) + '\n',
   )
   console.log(
     `${scenes.length} living scenes verified across a ${SHOWCASE_LOOP_SECONDS}s loop; ` +
-    `balanced ${SHOWCASE_TRANSITION_SECONDS}s crossfade; motion delta ${motionDelta.toFixed(3)}`,
+    `one fish timeline; balanced ${SHOWCASE_TRANSITION_SECONDS}s crossfade; ` +
+    `motion delta ${motionDelta.toFixed(3)}`,
   )
 } finally {
   await browser.close()

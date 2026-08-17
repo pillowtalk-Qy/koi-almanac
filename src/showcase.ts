@@ -34,9 +34,17 @@ function sceneKeyframes(index: number): string {
 
 export function renderReadmeShowcase(seed = 'koi-almanac-showcase'): string {
   const grid = demoGrid(seed)
-  const rendered = scenes.map(scene => {
-    const environment = deriveEnvironment(momentFromText(scene.date, scene.time), scene.season)
-    const pond = plan(grid, seed, undefined, environment)
+  const environments = scenes.map(scene => ({
+    ...deriveEnvironment(momentFromText(scene.date, scene.time), scene.season),
+    activityRate: 1,
+  }))
+  const winterEnvironment = environments.find(environment => environment.season === 'winter')
+  if (!winterEnvironment) throw new Error('The living showcase requires a winter scene')
+
+  // One winter-safe plan keeps every fish and feeding event on the same timeline while the ecology changes.
+  const pond = plan(grid, seed, undefined, winterEnvironment)
+  const rendered = scenes.map((scene, index) => {
+    const environment = environments[index]
     const svg = renderSVG(grid, pond, themeForEnvironment(environment), seed, { environment }).svg
     return { ...scene, data: Buffer.from(svg).toString('base64') }
   })
@@ -55,7 +63,7 @@ export function renderReadmeShowcase(seed = 'koi-almanac-showcase'): string {
     `role="img" aria-labelledby="showcase-title showcase-desc">` +
     `<title id="showcase-title">Koi Almanac seasonal cycle</title>` +
     `<desc id="showcase-desc">A living contribution pond moving through spring, summer, autumn, ` +
-    `winter, daylight and night.</desc>` +
+    `winter, daylight and night on one continuous ecosystem timeline.</desc>` +
     `<style>.showcase-scene{opacity:0;animation-duration:${SHOWCASE_LOOP_SECONDS}s;` +
     `animation-timing-function:cubic-bezier(0.45,0,0.55,1);animation-iteration-count:infinite}` +
     `${classes}${keyframes}` +

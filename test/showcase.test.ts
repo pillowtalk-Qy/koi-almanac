@@ -26,5 +26,13 @@ describe('README seasonal showcase', () => {
     }
     expect(showcaseScenes().map(scene => scene.phase)).toEqual(['day', 'night', 'day', 'night'])
     expect(decoded.every(scene => scene.includes('<svg'))).toBe(true)
+
+    const fishTimelines = decoded.map(scene => {
+      const start = scene.indexOf('@keyframes fp0')
+      expect(start).toBeGreaterThan(-1)
+      return scene.slice(start, scene.indexOf('</style>'))
+    })
+    expect(fishTimelines.every(timeline => timeline.length > 100)).toBe(true)
+    expect(new Set(fishTimelines).size).toBe(1)
   })
 })
