@@ -178,7 +178,12 @@ async function visualBoundaryRegression(page: Page) {
   return report
 }
 
-type PhaseMap = Record<string, number>
+interface MotionSample {
+  currentTime: number
+  phase: number
+}
+
+type PhaseMap = Record<string, MotionSample>
 
 const circularDistance = (left: number, right: number) => {
   const distance = Math.abs(left - right)
@@ -187,13 +192,16 @@ const circularDistance = (left: number, right: number) => {
 
 async function pondPhases(page: Page): Promise<PhaseMap> {
   return await page.$eval('#pond', pond => {
-    const phases: Record<string, number> = {}
+    const phases: Record<string, { currentTime: number; phase: number }> = {}
     for (const animation of pond.getAnimations({ subtree: true })) {
       const name = 'animationName' in animation ? String(animation.animationName) : ''
-      if (!/^(?:fp0|turtle)$/.test(name) || name in phases) continue
+      if (!/^(?:fp0|turtle|current)$/.test(name) || name in phases) continue
       const duration = Number(animation.effect?.getTiming().duration)
       const currentTime = Number(animation.currentTime)
-      phases[name] = ((currentTime % duration) + duration) % duration / duration
+      phases[name] = {
+        currentTime,
+        phase: ((currentTime % duration) + duration) % duration / duration,
+      }
     }
     return phases
   })
@@ -202,9 +210,18 @@ async function pondPhases(page: Page): Promise<PhaseMap> {
 async function interactionBoundaryRegression(page: Page) {
   const html = readFileSync('site/index.html', 'utf8')
   const bundle = readFileSync('site/demo.js', 'utf8')
+  const workerBundle = readFileSync('site/pond-worker.js', 'utf8')
   const server = createServer((request, response) => {
-    response.setHeader('Content-Type', request.url === '/demo.js' ? 'text/javascript' : 'text/html')
-    response.end(request.url === '/demo.js' ? bundle : html)
+    if (request.url === '/demo.js') {
+      response.setHeader('Content-Type', 'text/javascript')
+      response.end(bundle)
+    } else if (request.url === '/pond-worker.js') {
+      response.setHeader('Content-Type', 'text/javascript')
+      response.end(workerBundle)
+    } else {
+      response.setHeader('Content-Type', 'text/html')
+      response.end(html)
+    }
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
@@ -237,6 +254,8 @@ async function interactionBoundaryRegression(page: Page) {
       { waitUntil: 'networkidle0' },
     )
     await page.waitForSelector('#result:not([hidden])')
+    const renderer = await page.evaluate(() => document.documentElement.dataset.renderWorker)
+    assert(renderer === 'active', `Explorer used ${renderer ?? 'no'} background renderer`)
     await delay(250)
     await page.evaluate(() => {
       const state = window as typeof window & { __pondMounts?: number }
@@ -247,7 +266,12 @@ async function interactionBoundaryRegression(page: Page) {
     })
 
     const before = await pondPhases(page)
-    assert(Number.isFinite(before.fp0) && Number.isFinite(before.turtle), 'Fish or turtle animation is missing before drag')
+    assert(
+      Number.isFinite(before.fp0?.phase) &&
+        Number.isFinite(before.turtle?.phase) &&
+        Number.isFinite(before.current?.phase),
+      'Fish, turtle or ecosystem animation is missing before drag',
+    )
     await page.$eval('#year-timeline', timeline => {
       for (let value = 35; value <= 125; value += 3) {
         timeline.value = String(value)
@@ -260,8 +284,12 @@ async function interactionBoundaryRegression(page: Page) {
       (window as typeof window & { __pondMounts?: number }).__pondMounts ?? 0,
     )
     assert(previewMounts <= 4, `Rapid timeline input mounted ${previewMounts} SVGs instead of being coalesced`)
-    assert(circularDistance(before.fp0, preview.fp0) < 0.06, 'Fish animation phase reset during timeline preview')
-    assert(circularDistance(before.turtle, preview.turtle) < 0.08, 'Turtle animation phase reset during timeline preview')
+    assert(circularDistance(before.fp0.phase, preview.fp0.phase) < 0.06, 'Fish animation phase reset during timeline preview')
+    assert(circularDistance(before.turtle.phase, preview.turtle.phase) < 0.08, 'Turtle animation phase reset during timeline preview')
+    assert(
+      preview.current.currentTime > before.current.currentTime + 120,
+      'Ecosystem clock reset during timeline preview',
+    )
 
     await page.$eval('#year-timeline', timeline => timeline.dispatchEvent(new Event('change', { bubbles: true })))
     await delay(560)
@@ -270,8 +298,12 @@ async function interactionBoundaryRegression(page: Page) {
       (window as typeof window & { __pondMounts?: number }).__pondMounts ?? 0,
     )
     assert(committedMounts > previewMounts, 'Timeline release did not perform a final committed render')
-    assert(circularDistance(preview.fp0, committed.fp0) < 0.08, 'Fish animation phase reset after timeline release')
-    assert(circularDistance(preview.turtle, committed.turtle) < 0.1, 'Turtle animation phase reset after timeline release')
+    assert(circularDistance(preview.fp0.phase, committed.fp0.phase) < 0.08, 'Fish animation phase reset after timeline release')
+    assert(circularDistance(preview.turtle.phase, committed.turtle.phase) < 0.1, 'Turtle animation phase reset after timeline release')
+    assert(
+      committed.current.currentTime > preview.current.currentTime + 300,
+      'Ecosystem clock reset after timeline release',
+    )
     await page.screenshot({ path: join(outputDirectory, 'timeline-committed.png'), fullPage: true })
     return { before, preview, committed, previewMounts, committedMounts }
   } finally {
@@ -298,7 +330,7 @@ try {
   console.log(
     `${visual.length} adjacent visual boundaries stayed continuous; ` +
       `${interaction.previewMounts} preview mount(s), ${interaction.committedMounts} after commit; ` +
-      'fish and turtle phases preserved',
+      'fish and turtle phases plus the ecosystem clock were preserved',
   )
 } finally {
   await browser.close()

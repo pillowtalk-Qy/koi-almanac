@@ -1,9 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "explorer": "https://pillowtalk-qy.github.io/koi-almanac/",
   "worker": "https://koi-almanac-contributions.intentflow-inspector.workers.dev",
   "syntheticUser": "pillowtalk-Qy",
   "timezoneOffsetMinutes": 480,
+  "profilePage": "https://github.com/pillowtalk-Qy",
+  "profileReadme": "https://raw.githubusercontent.com/pillowtalk-Qy/pillowtalk-Qy/main/README.md",
   "profileSvg": "https://raw.githubusercontent.com/pillowtalk-Qy/pillowtalk-Qy/output/koi-almanac.svg",
   "profileState": "https://raw.githubusercontent.com/pillowtalk-Qy/pillowtalk-Qy/output/pond-state.json"
 }

@@ -6,7 +6,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 
-export function validateExplorer(html: string, javascript: string): void {
+export function validateExplorer(html: string, javascript: string, workerJavascript: string): void {
   assert(html.includes('<title>Koi Almanac:'), 'Explorer title is missing')
   assert(html.includes('<form id="form">'), 'Explorer form is missing')
   assert(html.includes('<div id="pond"></div>'), 'Explorer pond mount is missing')
@@ -18,6 +18,31 @@ export function validateExplorer(html: string, javascript: string): void {
     javascript.includes('koi-almanac-contributions.intentflow-inspector.workers.dev'),
     'Explorer bundle does not reference the production contribution Worker',
   )
+  assert(workerJavascript.length > 50_000, 'Explorer render Worker bundle is unexpectedly small')
+  assert(workerJavascript.includes('koipond-environment'), 'Explorer render Worker has no environment renderer')
+}
+
+export function validateProfilePresentation(
+  profileHtml: string,
+  readme: string,
+  expectedSvg: string,
+  expectedExplorer: string,
+): void {
+  assert(readme.includes(expectedSvg), 'Profile README does not embed the production pond SVG')
+  assert(readme.includes(expectedExplorer), 'Profile README does not link the pond to its explorer')
+  assert(/alt="[^"]*Koi Almanac[^"]*"/.test(readme), 'Profile README pond has no descriptive alt text')
+  assert(profileHtml.includes(expectedSvg), 'Rendered GitHub Profile does not contain the production pond SVG')
+  assert(profileHtml.includes(expectedExplorer), 'Rendered GitHub Profile pond does not link to its explorer')
+  assert(/alt="[^"]*Koi Almanac[^"]*"/.test(profileHtml), 'Rendered GitHub Profile lost the pond alt text')
+}
+
+export function validateProfileDelivery(headers: Headers): void {
+  assert(headers.get('content-type')?.startsWith('image/svg+xml'), 'Profile SVG content type changed')
+  assert(/(?:^|,)\s*max-age=\d+/.test(headers.get('cache-control') ?? ''), 'Profile SVG has no explicit cache lifetime')
+  assert(headers.get('x-content-type-options') === 'nosniff', 'Profile SVG no longer disables MIME sniffing')
+  assert(headers.get('access-control-allow-origin') === '*', 'Profile SVG is no longer publicly readable cross-origin')
+  const policy = headers.get('content-security-policy') ?? ''
+  assert(policy.includes("default-src 'none'") && policy.includes('sandbox'), 'Profile SVG security policy changed')
 }
 
 export function validateHealth(value: unknown): void {
@@ -88,6 +113,9 @@ export function validateProductionArtifacts(
 ): PondState {
   assert(svg.startsWith('<svg ') && svg.includes('viewBox="0 0 '), 'Profile SVG is malformed')
   assert(svg.length > 50_000, 'Profile SVG is unexpectedly small')
+  assert(svg.includes('@keyframes fp0{'), 'Profile SVG has no native fish animation')
+  assert(svg.includes('animation-iteration-count:infinite'), 'Profile SVG animations are not persistent')
+  assert(!/<script[\s>]/i.test(svg), 'Profile SVG unexpectedly contains executable script')
   const state = verifyPondState(stateValue)
   assert(state, 'Profile state failed its SHA-256 verification')
   assert(state.owner === expectedOwner, `Profile state owner is ${state.owner}, expected ${expectedOwner}`)

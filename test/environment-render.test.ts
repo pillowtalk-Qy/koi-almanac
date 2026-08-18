@@ -198,6 +198,25 @@ describe('environment-aware original renderer', () => {
     expect(renders[2]).not.toContain('data-seasonal-part="winter-snowfall"')
   })
 
+  it('reserves ambient motion density for each season\'s signature event', () => {
+    const render = (season: 'spring' | 'summer' | 'autumn' | 'winter', time: string) => {
+      const environment = deriveEnvironment(momentFromText('2026-08-16', time), season)
+      return renderSVG(grid, pondPlan, themeForEnvironment(environment), 'seasonal-render', { environment }).svg
+    }
+    const attribute = (svg: string, name: string) => Number(svg.match(new RegExp(`data-${name}="([\\d.]+)"`))?.[1])
+    const spring = render('spring', '00:00')
+    const summer = render('summer', '00:00')
+    const autumn = render('autumn', '12:00')
+    const winter = render('winter', '00:00')
+
+    expect(attribute(spring, 'ambient-density')).toBe(1)
+    expect(attribute(summer, 'ambient-density')).toBeLessThan(attribute(spring, 'ambient-density'))
+    expect(attribute(autumn, 'ambient-density')).toBeLessThan(attribute(spring, 'ambient-density'))
+    expect(attribute(winter, 'ambient-density')).toBeLessThan(attribute(spring, 'ambient-density'))
+    expect(attribute(winter, 'ambient-motes')).toBeLessThan(attribute(spring, 'ambient-motes'))
+    expect(attribute(winter, 'ambient-ripples')).toBeLessThanOrEqual(attribute(spring, 'ambient-ripples'))
+  })
+
   it('moves a restrained water-light path with the solar direction', () => {
     const morning = deriveEnvironment(momentFromText('2026-08-16', '06:15'), 'summer')
     const evening = deriveEnvironment(momentFromText('2026-08-16', '18:15'), 'summer')

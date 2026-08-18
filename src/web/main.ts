@@ -1,9 +1,15 @@
 import { gridFromDays, type Day } from '../github'
 import { deriveEnvironment, momentAtTimezone, momentFromText, type PondEnvironment } from '../environment'
-import { plan } from '../planner'
-import { THEMES, themeForEnvironment } from '../render/palette'
-import { renderSVG } from '../render/svg'
 import type { Grid, Plan } from '../types'
+import {
+  runRenderJob,
+  type AutoRenderResult,
+  type FixedRenderResult,
+  type RenderJob,
+  type RenderJobResult,
+  type RenderWorkerRequest,
+  type RenderWorkerResponse,
+} from './render-jobs'
 
 const CONTRIBUTION_API = 'https://koi-almanac-contributions.intentflow-inspector.workers.dev'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -132,9 +138,66 @@ let pondTransitionRevision = 0
 let environmentFrame: number | undefined
 let environmentPreviewTimer: number | undefined
 let lastEnvironmentPreview = -Infinity
+let generationRevision = 0
 
 const ENVIRONMENT_PREVIEW_INTERVAL = 80
 const PERSISTENT_POND_MOTION = /^(?:fp\d+|turtle(?:-.+)?)$/
+const ecologyMotionStartedAt = performance.now()
+
+let renderWorker: Worker | null = null
+let renderWorkerRevision = 0
+const pendingRenderJobs = new Map<number, {
+  resolve: (result: RenderJobResult) => void
+  reject: (error: Error) => void
+}>()
+
+function disableRenderWorker(error: Error) {
+  renderWorker?.terminate()
+  renderWorker = null
+  document.documentElement.dataset.renderWorker = 'fallback'
+  for (const pending of pendingRenderJobs.values()) pending.reject(error)
+  pendingRenderJobs.clear()
+}
+
+if ('Worker' in window) {
+  try {
+    renderWorker = new Worker(new URL('pond-worker.js', document.baseURI))
+    document.documentElement.dataset.renderWorker = 'starting'
+    renderWorker.onmessage = (event: MessageEvent<RenderWorkerResponse>) => {
+      const pending = pendingRenderJobs.get(event.data.revision)
+      if (!pending) return
+      pendingRenderJobs.delete(event.data.revision)
+      if ('error' in event.data) pending.reject(new Error(event.data.error))
+      else {
+        document.documentElement.dataset.renderWorker = 'active'
+        pending.resolve(event.data.result)
+      }
+    }
+    renderWorker.onerror = () => disableRenderWorker(new Error('Background renderer failed to load'))
+  } catch {
+    renderWorker = null
+    document.documentElement.dataset.renderWorker = 'fallback'
+  }
+} else {
+  document.documentElement.dataset.renderWorker = 'fallback'
+}
+
+async function renderPondJob<T extends RenderJobResult>(job: RenderJob): Promise<T> {
+  if (!renderWorker) return runRenderJob(job) as T
+  const revision = ++renderWorkerRevision
+  const request: RenderWorkerRequest = { revision, job }
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      pendingRenderJobs.set(revision, {
+        resolve: result => resolve(result as T),
+        reject,
+      })
+      renderWorker?.postMessage(request)
+    })
+  } catch {
+    return runRenderJob(job) as T
+  }
+}
 
 interface PondMotionPhase {
   phase: number
@@ -200,22 +263,25 @@ function selectedEnvironment(): PondEnvironment {
   return deriveEnvironment(momentFromText(date.value, time.value))
 }
 
-function renderAuto(preview = false) {
-  if (!currentGrid || !currentPlan) return
+async function renderAuto(preview = false, revision = pondTransitionRevision): Promise<boolean> {
+  if (!currentGrid || !currentPlan) return false
   if (live.checked) updateLiveInputs()
   else syncEnvironmentTimelines()
   const environment = selectedEnvironment()
-  const environmentPlan = preview && committedAutoPlan
-    ? committedAutoPlan
-    : plan(currentGrid, currentUser, undefined, environment)
-  if (!preview) committedAutoPlan = environmentPlan
-  svgs.auto = renderSVG(
-    currentGrid,
-    environmentPlan,
-    themeForEnvironment(environment),
-    currentUser,
-    { environment },
-  ).svg
+  const grid = currentGrid
+  const user = currentUser
+  const rendered = await renderPondJob<AutoRenderResult>({
+    kind: 'auto',
+    grid,
+    user,
+    environment,
+    plan: preview && committedAutoPlan ? committedAutoPlan : undefined,
+  })
+  if (revision !== pondTransitionRevision || grid !== currentGrid || user !== currentUser || active !== 'auto') {
+    return false
+  }
+  if (!preview) committedAutoPlan = rendered.plan
+  svgs.auto = rendered.svg
   const clock = `${pad(Math.floor(environment.minuteOfDay / 60))}:${pad(environment.minuteOfDay % 60)}`
   momentLabel.textContent = `${environment.date} · ${clock} HKT · ${environment.season} · ${environment.phase}`
   for (const button of document.querySelectorAll<HTMLButtonElement>('.season-jump')) {
@@ -224,6 +290,7 @@ function renderAuto(preview = false) {
   for (const button of document.querySelectorAll<HTMLButtonElement>('.phase-jump')) {
     button.classList.toggle('on', button.dataset.phase === environment.phase)
   }
+  return true
 }
 
 function scheduleEnvironmentPreview() {
@@ -234,7 +301,7 @@ function scheduleEnvironmentPreview() {
     environmentFrame = window.requestAnimationFrame(() => {
       environmentFrame = undefined
       lastEnvironmentPreview = performance.now()
-      if (active === 'auto') show('auto', false, true)
+      if (active === 'auto') showPond('auto', false, true)
       syncURL()
     })
   }, wait)
@@ -250,7 +317,7 @@ function finishEnvironmentPreview() {
     environmentFrame = undefined
   }
   lastEnvironmentPreview = performance.now()
-  if (active === 'auto') show('auto', true)
+  if (active === 'auto') showPond('auto', true)
   syncURL()
 }
 
@@ -270,11 +337,14 @@ function pondMotionPhases(): Map<string, PondMotionPhase> {
 }
 
 function restorePondMotion(phases: Map<string, PondMotionPhase>) {
-  if (phases.size === 0) return
+  const ecologyTime = performance.now() - ecologyMotionStartedAt
   for (const animation of pond.getAnimations({ subtree: true })) {
     const name = 'animationName' in animation ? String(animation.animationName) : ''
     const previous = phases.get(name)
-    if (!previous) continue
+    if (!previous) {
+      if (!PERSISTENT_POND_MOTION.test(name)) animation.currentTime = ecologyTime
+      continue
+    }
     const duration = Number(animation.effect?.getTiming().duration)
     if (!Number.isFinite(duration) || duration <= 0) continue
     animation.currentTime = previous.phase * duration
@@ -294,17 +364,18 @@ function mountPond(mode: ViewMode) {
   download.download = `koi-almanac-${mode}.svg`
 }
 
-function show(mode: ViewMode, animate = false, preview = false) {
+async function show(mode: ViewMode, animate = false, preview = false): Promise<void> {
+  const revision = ++pondTransitionRevision
   active = mode
-  if (mode === 'auto') renderAuto(preview)
+  if (pondSwapTimer !== undefined) window.clearTimeout(pondSwapTimer)
+  pond.classList.remove('pond-leaving', 'pond-entering')
   for (const b of tabs.querySelectorAll('button')) {
     b.classList.toggle('on', b.dataset.theme === mode)
   }
   document.body.classList.toggle('fixed-environment', mode !== 'auto')
+  if (mode === 'auto' && !(await renderAuto(preview, revision))) return
+  if (revision !== pondTransitionRevision || active !== mode) return
 
-  const revision = ++pondTransitionRevision
-  if (pondSwapTimer !== undefined) window.clearTimeout(pondSwapTimer)
-  pond.classList.remove('pond-leaving', 'pond-entering')
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const shouldTransition = animate && Boolean(pond.querySelector('svg')) && !reduceMotion
   if (!shouldTransition) {
@@ -332,21 +403,29 @@ function show(mode: ViewMode, animate = false, preview = false) {
   }, 210)
 }
 
+function showPond(mode: ViewMode, animate = false, preview = false) {
+  void show(mode, animate, preview).catch(error => {
+    status.dataset.tone = 'error'
+    status.textContent = error instanceof Error ? error.message : String(error)
+  })
+}
+
 async function generate(user: string) {
+  const revision = ++generationRevision
   button.disabled = true
   status.removeAttribute('data-tone')
   status.textContent = 'Fetching contributions and simulating the pond...'
   result.hidden = true
   try {
     const { grid, stale, fetchedAt } = await fetchGrid(user)
-    const p = plan(grid, user)
+    const rendered = await renderPondJob<FixedRenderResult>({ kind: 'fixed', grid, user })
+    if (revision !== generationRevision) return
     currentGrid = grid
-    currentPlan = p
+    currentPlan = rendered.plan
     committedAutoPlan = null
     currentUser = user
-    svgs.light = renderSVG(grid, p, THEMES.light, user).svg
-    svgs.dark = renderSVG(grid, p, THEMES.dark, user).svg
-    renderAuto()
+    svgs.light = rendered.light
+    svgs.dark = rendered.dark
     if (stale) {
       const snapshot = fetchedAt ? ` from ${new Date(fetchedAt).toLocaleString()}` : ''
       status.dataset.tone = 'warning'
@@ -356,14 +435,14 @@ async function generate(user: string) {
       status.textContent = ''
     }
     result.hidden = false
-    show(active)
+    await show(active)
     fillInstall(user)
     syncURL()
   } catch (err) {
     status.dataset.tone = 'error'
     status.textContent = err instanceof Error ? err.message : String(err)
   } finally {
-    button.disabled = false
+    if (revision === generationRevision) button.disabled = false
   }
 }
 
@@ -385,12 +464,12 @@ document.querySelectorAll<HTMLButtonElement>('.chip').forEach(chip => {
 
 tabs.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button')
-  if (b?.dataset.theme) show(b.dataset.theme as ViewMode, true)
+  if (b?.dataset.theme) showPond(b.dataset.theme as ViewMode, true)
 })
 
 live.addEventListener('change', () => {
   if (live.checked) updateLiveInputs()
-  if (active === 'auto') show('auto', true)
+  if (active === 'auto') showPond('auto', true)
   syncURL()
 })
 
@@ -398,7 +477,7 @@ for (const control of [date, time]) {
   control.addEventListener('input', () => {
     live.checked = false
     syncEnvironmentTimelines()
-    if (active === 'auto') show('auto', true)
+    if (active === 'auto') showPond('auto', true)
     syncURL()
   })
 }
@@ -432,7 +511,7 @@ document.querySelectorAll<HTMLButtonElement>('.season-jump').forEach(button => {
     date.value = `${year}-${button.dataset.monthDay}`
     live.checked = false
     syncEnvironmentTimelines()
-    show('auto', true)
+    showPond('auto', true)
     syncURL()
   })
 })
@@ -442,7 +521,7 @@ document.querySelectorAll<HTMLButtonElement>('.phase-jump').forEach(button => {
     time.value = button.dataset.time ?? time.value
     live.checked = false
     syncEnvironmentTimelines()
-    show('auto', true)
+    showPond('auto', true)
     syncURL()
   })
 })
@@ -466,7 +545,7 @@ if (presetTime && /^\d{2}:\d{2}$/.test(presetTime)) time.value = presetTime
 if (presetDate || presetTime) live.checked = false
 syncEnvironmentTimelines()
 setInterval(() => {
-  if (live.checked && active === 'auto' && currentGrid) show('auto')
+  if (live.checked && active === 'auto' && currentGrid) showPond('auto')
 }, 60_000)
 if (preset) {
   input.value = preset

@@ -4,6 +4,8 @@ import {
   validateContributions,
   validateExplorer,
   validateHealth,
+  validateProfileDelivery,
+  validateProfilePresentation,
   validateProductionArtifacts,
 } from '../src/synthetic-monitor'
 import type { PondGenerator } from '../src/state'
@@ -14,6 +16,8 @@ interface MonitorConfig {
   worker: string
   syntheticUser: string
   timezoneOffsetMinutes: number
+  profilePage: string
+  profileReadme: string
   profileSvg: string
   profileState: string
 }
@@ -31,7 +35,7 @@ interface Retrieved {
 const root = process.cwd()
 const config = JSON.parse(readFileSync(resolve(root, 'monitor.json'), 'utf8')) as MonitorConfig
 const release = JSON.parse(readFileSync(resolve(root, 'release.json'), 'utf8')) as ReleaseManifest
-if (config.schemaVersion !== 1 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
+if (config.schemaVersion !== 2 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
 
 const wait = (milliseconds: number) => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
 
@@ -74,7 +78,8 @@ async function retrieve(
 const explorerURL = new URL(config.explorer)
 const explorer = await retrieve('explorer html', explorerURL.href, 'text/html')
 const bundle = await retrieve('explorer bundle', new URL('demo.js', explorerURL).href, 'text/javascript')
-validateExplorer(explorer.body, bundle.body)
+const renderWorker = await retrieve('explorer render worker', new URL('pond-worker.js', explorerURL).href, 'text/javascript')
+validateExplorer(explorer.body, bundle.body, renderWorker.body)
 
 const health = await retrieve('worker health', `${config.worker}/health`, 'application/json', {
   origin: explorerURL.origin,
@@ -103,10 +108,16 @@ if (cacheStatus === 'STALE' && contributions.response.headers.get('x-koipond-deg
 }
 const dayCount = validateContributions(JSON.parse(contributions.body))
 
-const [profileSvg, profileState] = await Promise.all([
+const profileExplorer = new URL(config.explorer)
+profileExplorer.searchParams.set('user', config.syntheticUser)
+const [profilePage, profileReadme, profileSvg, profileState] = await Promise.all([
+  retrieve('rendered github profile', config.profilePage, 'text/html'),
+  retrieve('profile readme', config.profileReadme, 'text/plain'),
   retrieve('profile svg', config.profileSvg, 'image/svg+xml'),
   retrieve('profile state', config.profileState, 'application/json', { maximumBytes: 1_000_000 }),
 ])
+validateProfilePresentation(profilePage.body, profileReadme.body, config.profileSvg, profileExplorer.href)
+validateProfileDelivery(profileSvg.response.headers)
 const state = validateProductionArtifacts(
   profileSvg.body,
   JSON.parse(profileState.body),
@@ -116,7 +127,10 @@ const state = validateProductionArtifacts(
 )
 
 console.log(
-  `PASS production contract  ${dayCount} public days  pond revision ${state.revision}  ` +
+  `PASS profile delivery  rendered README -> animated SVG -> verified state revision ${state.revision}`,
+)
+console.log(
+  `PASS production contract  ${dayCount} public days  ` +
     `${release.action.repository}@${release.action.sha}`,
 )
 console.log('Privacy: fixed synthetic identity, no cookies, no visitor identifiers, no response bodies retained')

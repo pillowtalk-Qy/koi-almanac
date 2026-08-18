@@ -506,8 +506,24 @@ export function renderSVG(
   const sheenIntensity = environment
     ? Math.min(1, 0.58 + environment.daylight * 0.32 + environment.goldenLight * 0.1)
     : 1
-  const moteCount = environment ? Math.round(3 + surfaceMotion * 5) : 8
-  const ambientRippleCount = environment ? Math.max(1, Math.round(1 + surfaceMotion * 3)) : 3
+  const summerNightActivity = environment
+    ? environment.summerBloom * environment.nightDepth
+    : 0
+  const winterSnowActivity = environment
+    ? environment.winterStillness * (0.72 + environment.nightDepth * 0.28)
+    : 0
+  const seasonalSpectacle = Math.max(
+    summerNightActivity,
+    winterSnowActivity,
+    environment?.mapleDrift ?? 0,
+  )
+  const ambientDensity = 1 - seasonalSpectacle * 0.55
+  const moteCount = environment
+    ? Math.max(2, Math.round((3 + surfaceMotion * 5) * ambientDensity))
+    : 8
+  const ambientRippleCount = environment
+    ? Math.max(1, Math.round((1 + surfaceMotion * 3) * (1 - seasonalSpectacle * 0.35)))
+    : 3
   const swayAngle = environment ? 0.9 + surfaceMotion * 2 : 2.6
   const swayBias = currentVector * 1.25
   const currentFromX = -22 * currentVector
@@ -539,13 +555,6 @@ export function renderSVG(
         .map(([phase, at]) => ` data-turtle-${phase}="${at.toFixed(2)}"`)
         .join('')
     : ''
-  const summerNightActivity = environment
-    ? environment.summerBloom * environment.nightDepth
-    : 0
-  const winterSnowActivity = environment
-    ? environment.winterStillness * (0.72 + environment.nightDepth * 0.28)
-    : 0
-
   const base = `
 .pk,.rp{transform-box:fill-box;transform-origin:center;animation-duration:${animationDuration}s;animation-timing-function:linear;animation-iteration-count:infinite}
 .rp{opacity:0}
@@ -654,7 +663,7 @@ ${turtleScene.css}
     ? ` It is ${context.environment.phase} in ${context.environment.season}.`
     : ''
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${LAYOUT.height}" width="${width}" height="${LAYOUT.height}" role="img" aria-labelledby="kp-title-${theme.key} kp-desc-${theme.key}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${LAYOUT.height}" width="${width}" height="${LAYOUT.height}" role="img" aria-labelledby="kp-title-${theme.key} kp-desc-${theme.key}" data-ambient-density="${ambientDensity.toFixed(3)}" data-ambient-motes="${moteCount}" data-ambient-ripples="${ambientRippleCount}">` +
     `<title id="kp-title-${theme.key}">${owner ? `${escapeXML(owner)}'s ` : ''}Contribution koi pond</title>` +
     `<desc id="kp-desc-${theme.key}">${plan.eats.length} contribution plankton grazed by ${plan.fishes.length} fish in a deterministic animated ecosystem${context.provenance ? `, cryptographically linked at revision ${context.provenance.revision}` : ''}.${environmentDescription}</desc>` +
     provenance +

@@ -37,7 +37,7 @@
     "release:check": "node --import tsx scripts/release.ts --check",
     "release:sync": "node --import tsx scripts/release.ts --sync",
     "build:readme-demo": "node --import tsx scripts/readme-demo.ts",
-    "build:site": "esbuild src/web/main.ts --bundle --minify --format=iife --outfile=site/demo.js",
+    "build:site": "esbuild src/web/main.ts --bundle --minify --format=iife --outfile=site/demo.js && esbuild src/web/pond-worker.ts --bundle --minify --format=iife --outfile=site/pond-worker.js",
     "cf:types": "wrangler types worker-configuration.d.ts",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
