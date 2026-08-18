@@ -909,24 +909,34 @@ export function pebbles(theme: Theme, r: () => number): string {
   return out
 }
 
-export function motes(width: number, theme: Theme, r: () => number, count = 8): string {
+const poolOpacity = (activeCount: number, index: number) => Math.min(1, Math.max(0, activeCount - index))
+
+export function motes(width: number, theme: Theme, r: () => number, activeCount = 8, poolSize = 8): string {
   let out = ''
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < poolSize; i++) {
     const x = f1(30 + r() * (width - 60))
     const y = f1(30 + r() * (LAYOUT.height - 70))
-    out += `<circle class="mo" style="animation-duration:${f1(8 + r() * 7)}s;animation-delay:-${f1(r() * 12)}s" cx="${x}" cy="${y}" r="${f1(0.8 + r() * 0.9)}" fill="${theme.mote}"/>`
+    const opacity = poolOpacity(activeCount, i)
+    out +=
+      `<g class="ambient-mote-slot" data-ambient-index="${i}" opacity="${opacity.toFixed(3)}">` +
+      `<circle class="mo" style="animation-duration:${f1(8 + r() * 7)}s;animation-delay:-${f1(r() * 12)}s" cx="${x}" cy="${y}" r="${f1(0.8 + r() * 0.9)}" fill="${theme.mote}"/>` +
+      `</g>`
   }
-  return out
+  return `<g data-pond-part="ambient-motes" data-ambient-active="${activeCount.toFixed(3)}">${out}</g>`
 }
 
-export function ambientRipples(width: number, theme: Theme, r: () => number, count = 3): string {
+export function ambientRipples(width: number, theme: Theme, r: () => number, activeCount = 3, poolSize = 4): string {
   let out = ''
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < poolSize; i++) {
     const x = f1(50 + r() * (width - 100))
     const y = f1(30 + r() * (LAYOUT.height - 70))
-    out += `<circle class="ar" style="animation-delay:-${f1(r() * 9)}s" cx="${x}" cy="${y}" r="9" fill="none" stroke="${theme.ripple}" stroke-width="1"/>`
+    const opacity = poolOpacity(activeCount, i)
+    out +=
+      `<g class="ambient-ripple-slot" data-ambient-index="${i}" opacity="${opacity.toFixed(3)}">` +
+      `<circle class="ar" style="animation-delay:-${f1(r() * 9)}s" cx="${x}" cy="${y}" r="9" fill="none" stroke="${theme.ripple}" stroke-width="1"/>` +
+      `</g>`
   }
-  return out
+  return `<g data-pond-part="ambient-ripples" data-ambient-active="${activeCount.toFixed(3)}">${out}</g>`
 }
 
 export function turtle(theme: Theme, motionAttributes = ''): string {

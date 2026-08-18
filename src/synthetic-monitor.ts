@@ -45,6 +45,25 @@ export function validateProfileDelivery(headers: Headers): void {
   assert(policy.includes("default-src 'none'") && policy.includes('sandbox'), 'Profile SVG security policy changed')
 }
 
+export function validateProfileWorkflow(workflow: string): void {
+  assert(workflow.includes('repository: pillowtalk-Qy/koi-almanac'), 'Profile workflow does not select Koi Almanac')
+  assert(workflow.includes('ref: main'), 'Profile workflow does not read the published release manifest')
+  assert(workflow.includes('sparse-checkout: release.json'), 'Profile workflow does not isolate release.json')
+  assert(
+    workflow.includes('ref: ${{ steps.release.outputs.sha }}'),
+    'Profile workflow does not check out the resolved generator SHA',
+  )
+  assert(workflow.includes('uses: ./.koi-almanac'), 'Profile workflow does not execute the checked-out generator')
+  assert(
+    workflow.includes('generator_sha: ${{ steps.release.outputs.sha }}'),
+    'Profile workflow does not bind provenance to the resolved generator SHA',
+  )
+  assert(
+    !/uses:\s*pillowtalk-Qy\/koi-almanac@\S+/.test(workflow),
+    'Profile workflow still contains a manually synchronized Action reference',
+  )
+}
+
 export function validateHealth(value: unknown): void {
   assert(value !== null && typeof value === 'object' && !Array.isArray(value), 'Health response is not an object')
   const health = value as Record<string, unknown>

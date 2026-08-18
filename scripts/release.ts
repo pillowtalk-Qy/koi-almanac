@@ -16,7 +16,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const manifestPath = resolve(root, 'release.json')
 const mode = process.argv.includes('--sync') ? 'sync' : 'check'
 const setArgument = process.argv.find(argument => argument.startsWith('--set='))?.slice('--set='.length)
-const profileArgument = process.argv.find(argument => argument.startsWith('--profile='))?.slice('--profile='.length)
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ReleaseManifest
 if (setArgument) manifest.action.sha = setArgument
@@ -38,7 +37,7 @@ function trackedFiles(repositoryRoot: string): string[] {
     .filter(Boolean)
 }
 
-function synchronize(repositoryRoot: string, requireReference: boolean): number {
+function synchronize(repositoryRoot: string): number {
   const escapedRepository = manifest.action.repository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const pattern = new RegExp(`${escapedRepository}@([^\\s"'\\x60)<]+)`, 'g')
   let references = 0
@@ -62,21 +61,15 @@ function synchronize(repositoryRoot: string, requireReference: boolean): number 
     }
   }
 
-  if (requireReference && references === 0) failures.push('no Action references found')
   if (failures.length > 0) {
     throw new Error(`Release references do not match ${manifest.action.sha}:\n${failures.join('\n')}`)
   }
   return references
 }
 
-const coreReferences = synchronize(root, true)
-const profileReferences = profileArgument ? synchronize(resolve(profileArgument), true) : 0
-
-if (mode === 'sync') {
-  synchronize(root, true)
-  if (profileArgument) synchronize(resolve(profileArgument), true)
-}
+const legacyReferences = synchronize(root)
 
 console.log(
-  `${mode === 'sync' ? 'Synchronized' : 'Verified'} ${coreReferences + profileReferences} Action reference(s) at ${manifest.action.sha}`,
+  `${mode === 'sync' ? 'Synchronized' : 'Verified'} release manifest at ${manifest.action.sha}` +
+    `${legacyReferences > 0 ? ` and ${legacyReferences} legacy pinned reference(s)` : ''}`,
 )

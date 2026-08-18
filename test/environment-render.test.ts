@@ -215,6 +215,12 @@ describe('environment-aware original renderer', () => {
     expect(attribute(winter, 'ambient-density')).toBeLessThan(attribute(spring, 'ambient-density'))
     expect(attribute(winter, 'ambient-motes')).toBeLessThan(attribute(spring, 'ambient-motes'))
     expect(attribute(winter, 'ambient-ripples')).toBeLessThanOrEqual(attribute(spring, 'ambient-ripples'))
+    for (const svg of [spring, summer, autumn, winter]) {
+      expect(svg.match(/class="ambient-mote-slot"/g)).toHaveLength(8)
+      expect(svg.match(/class="ambient-ripple-slot"/g)).toHaveLength(4)
+    }
+    expect(winter).toMatch(/class="ambient-mote-slot" data-ambient-index="2" opacity="0\.[0-9]{3}"/)
+    expect(spring).toContain('class="ambient-mote-slot" data-ambient-index="2" opacity="1.000"')
   })
 
   it('moves a restrained water-light path with the solar direction', () => {

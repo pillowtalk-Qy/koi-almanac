@@ -22,6 +22,14 @@ inputs:
     description: "Token used to read the contribution calendar (falls back to public data when empty)"
     required: false
     default: ${{ github.token }}
+  generator_repository:
+    description: "Generator repository recorded in the verifiable state (set when invoking a checked-out local Action)"
+    required: false
+    default: ${{ github.action_repository }}
+  generator_sha:
+    description: "Exact generator commit recorded in the verifiable state (set when invoking a checked-out local Action)"
+    required: false
+    default: ${{ github.action_ref }}
   state_file:
     description: "Local state artifact. Publish it with the SVGs to preserve fish identity and growth"
     required: false
@@ -52,5 +60,5 @@ runs:
         KOIPOND_STATE_FILE: ${{ inputs.state_file }}
         KOIPOND_STATE_BRANCH: ${{ inputs.state_branch }}
         KOIPOND_STATE_PATH: ${{ inputs.state_path }}
-        KOIPOND_GENERATOR_REPOSITORY: ${{ github.action_repository }}
-        KOIPOND_GENERATOR_SHA: ${{ github.action_ref }}
+        KOIPOND_GENERATOR_REPOSITORY: ${{ inputs.generator_repository }}
+        KOIPOND_GENERATOR_SHA: ${{ inputs.generator_sha }}

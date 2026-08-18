@@ -1,6 +1,7 @@
 import { gridFromDays, type Day } from '../github'
 import { deriveEnvironment, momentAtTimezone, momentFromText, type PondEnvironment } from '../environment'
 import type { Grid, Plan } from '../types'
+import { PROFILE_WORKFLOW } from '../profile-workflow'
 import {
   runRenderJob,
   type AutoRenderResult,
@@ -10,6 +11,7 @@ import {
   type RenderWorkerRequest,
   type RenderWorkerResponse,
 } from './render-jobs'
+import { LatestJobQueue, SupersededJobError } from './latest-job-queue'
 
 const CONTRIBUTION_API = 'https://koi-almanac-contributions.intentflow-inspector.workers.dev'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -36,31 +38,6 @@ const dayTimeline = $<HTMLInputElement>('day-timeline')
 const yearTimelineValue = $<HTMLOutputElement>('year-timeline-value')
 const dayTimelineValue = $<HTMLOutputElement>('day-timeline-value')
 
-const workflowFor = () => `name: koi-almanac
-on:
-  schedule:
-    - cron: "17 * * * *"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-jobs:
-  generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: pillowtalk-Qy/koi-almanac@ceb9404b4136a94e7778a6395d431bacdaa9dc7a
-        with:
-          github_user_name: ${'$'}{{ github.repository_owner }}
-          outputs: |
-            dist/koi-almanac.svg?environment=auto&timezone=480&latitude=22.3193&longitude=114.1694
-      - uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
-        with:
-          github_token: ${'$'}{{ secrets.GITHUB_TOKEN }}
-          publish_branch: output
-          publish_dir: ./dist
-`
-
 const snippetFor = (user: string) => `<a href="https://pillowtalk-qy.github.io/koi-almanac/?user=${encodeURIComponent(user)}">
   <img alt="Koi Almanac" src="https://raw.githubusercontent.com/${user}/${user}/output/koi-almanac.svg">
 </a>
@@ -70,7 +47,7 @@ const snippetFor = (user: string) => `<a href="https://pillowtalk-qy.github.io/k
 function fillInstall(user: string) {
   const params = new URLSearchParams({
     filename: '.github/workflows/koi-almanac.yml',
-    value: workflowFor(),
+    value: PROFILE_WORKFLOW,
   })
   installLink.href = `https://github.com/${user}/${user}/new/main?${params}`
   installNote.textContent = `opens ${user}/${user} prefilled, just press commit`
@@ -151,6 +128,22 @@ const pendingRenderJobs = new Map<number, {
   reject: (error: Error) => void
 }>()
 
+function postRenderWorkerJob(job: RenderJob): Promise<RenderJobResult> {
+  const worker = renderWorker
+  if (!worker) return Promise.reject(new Error('Background renderer is unavailable'))
+  const revision = ++renderWorkerRevision
+  const request: RenderWorkerRequest = { revision, job }
+  return new Promise<RenderJobResult>((resolve, reject) => {
+    pendingRenderJobs.set(revision, { resolve, reject })
+    worker.postMessage(request)
+  })
+}
+
+const renderQueue = new LatestJobQueue(postRenderWorkerJob, queue => {
+  document.documentElement.dataset.renderQueue = String(Number(queue.active) + Number(queue.queued))
+  document.documentElement.dataset.renderSuperseded = String(queue.superseded)
+})
+
 function disableRenderWorker(error: Error) {
   renderWorker?.terminate()
   renderWorker = null
@@ -184,17 +177,10 @@ if ('Worker' in window) {
 
 async function renderPondJob<T extends RenderJobResult>(job: RenderJob): Promise<T> {
   if (!renderWorker) return runRenderJob(job) as T
-  const revision = ++renderWorkerRevision
-  const request: RenderWorkerRequest = { revision, job }
   try {
-    return await new Promise<T>((resolve, reject) => {
-      pendingRenderJobs.set(revision, {
-        resolve: result => resolve(result as T),
-        reject,
-      })
-      renderWorker?.postMessage(request)
-    })
-  } catch {
+    return await renderQueue.enqueue(job) as T
+  } catch (error) {
+    if (error instanceof SupersededJobError) throw error
     return runRenderJob(job) as T
   }
 }
@@ -405,6 +391,7 @@ async function show(mode: ViewMode, animate = false, preview = false): Promise<v
 
 function showPond(mode: ViewMode, animate = false, preview = false) {
   void show(mode, animate, preview).catch(error => {
+    if (error instanceof SupersededJobError) return
     status.dataset.tone = 'error'
     status.textContent = error instanceof Error ? error.message : String(error)
   })
@@ -439,6 +426,7 @@ async function generate(user: string) {
     fillInstall(user)
     syncURL()
   } catch (err) {
+    if (err instanceof SupersededJobError) return
     status.dataset.tone = 'error'
     status.textContent = err instanceof Error ? err.message : String(err)
   } finally {

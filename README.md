@@ -123,9 +123,33 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: pillowtalk-Qy/koi-almanac@ceb9404b4136a94e7778a6395d431bacdaa9dc7a
+      - name: Read the published Koi Almanac release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: pillowtalk-Qy/koi-almanac
+          ref: main
+          path: .koi-release
+          sparse-checkout: release.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - id: release
+        name: Validate the published generator
+        shell: bash
+        run: >-
+          node -e 'const fs=require("node:fs");const manifest=JSON.parse(fs.readFileSync(".koi-release/release.json","utf8"));const sha=manifest.action?.sha;if(manifest.schemaVersion!==1||manifest.action?.repository!=="pillowtalk-Qy/koi-almanac"||!/^[0-9a-f]{40}$/.test(sha??""))throw new Error("Invalid Koi Almanac release manifest");fs.appendFileSync(process.env.GITHUB_OUTPUT,"sha="+sha+"\n")'
+      - name: Check out the exact published generator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: pillowtalk-Qy/koi-almanac
+          ref: ${{ steps.release.outputs.sha }}
+          path: .koi-almanac
+          persist-credentials: false
+      - name: Generate the pond
+        uses: ./.koi-almanac
         with:
           github_user_name: ${{ github.repository_owner }}
+          generator_repository: pillowtalk-Qy/koi-almanac
+          generator_sha: ${{ steps.release.outputs.sha }}
           outputs: |
             dist/koi-almanac.svg?environment=auto&timezone=480&latitude=22.3193&longitude=114.1694
       - uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
@@ -175,7 +199,9 @@ The Action also writes `dist/pond-state.json`. Because the workflow publishes th
 directory to `output`, the next hourly run restores it automatically. The optional Action inputs
 `state_file`, `state_branch` and `state_path` change those locations.
 
-The workflow pins Koi Almanac to a full commit SHA for reproducibility.
+The workflow reads the published version from `release.json`, validates it, then checks out and executes
+that exact 40-character commit SHA. It follows future Koi Almanac releases automatically without running
+mutable `main` branch code; the generated proof records the exact generator commit.
 To use the original edition instead, follow the setup guide in
 [0xydev/koipond](https://github.com/0xydev/koipond#usage-github-action).
 
@@ -310,16 +336,17 @@ npm run visual:check  # 32 season/phase/profile/viewport baselines
 After an intentional visual change, inspect the rendered images in `.visual-regression/`, then run
 `npm run visual:update` to accept new baselines. Do not update baselines merely to make CI pass.
 
-Pinned Action references have one source of truth: [`release.json`](release.json). After a candidate
-commit passes CI, advance every core and Profile reference together with:
+Published Action versions have one source of truth: [`release.json`](release.json). Profile workflows
+resolve that manifest automatically, so after a candidate commit passes CI only the manifest advances:
 
 ```sh
-npm run release:sync -- --set=<verified-40-character-sha> --profile=../pillowtalk-Qy-profile
-npm run release:check -- --profile=../pillowtalk-Qy-profile
+npm run release:sync -- --set=<verified-40-character-sha>
+npm run release:check
 ```
 
-Commit the synchronized references as a small follow-up release commit. CI rejects stale core
-references automatically.
+Commit the updated manifest as a small follow-up release commit. CI checks its format and verifies that
+the published SHA is an ancestor of the release commit; the production monitor checks that the Profile
+workflow still resolves and executes that SHA.
 
 New species, decor, themes and achievement rules are all good first issues: species live in
 `src/render/fish.ts`, decor in `src/render/decor.ts`, colors in `src/render/palette.ts`.

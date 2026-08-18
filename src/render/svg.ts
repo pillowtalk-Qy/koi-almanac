@@ -518,11 +518,11 @@ export function renderSVG(
     environment?.mapleDrift ?? 0,
   )
   const ambientDensity = 1 - seasonalSpectacle * 0.55
-  const moteCount = environment
-    ? Math.max(2, Math.round((3 + surfaceMotion * 5) * ambientDensity))
+  const moteActivity = environment
+    ? Math.max(2, Math.min(8, (3 + surfaceMotion * 5) * ambientDensity))
     : 8
-  const ambientRippleCount = environment
-    ? Math.max(1, Math.round((1 + surfaceMotion * 3) * (1 - seasonalSpectacle * 0.35)))
+  const ambientRippleActivity = environment
+    ? Math.max(1, Math.min(4, (1 + surfaceMotion * 3) * (1 - seasonalSpectacle * 0.35)))
     : 3
   const swayAngle = environment ? 0.9 + surfaceMotion * 2 : 2.6
   const swayBias = currentVector * 1.25
@@ -663,7 +663,7 @@ ${turtleScene.css}
     ? ` It is ${context.environment.phase} in ${context.environment.season}.`
     : ''
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${LAYOUT.height}" width="${width}" height="${LAYOUT.height}" role="img" aria-labelledby="kp-title-${theme.key} kp-desc-${theme.key}" data-ambient-density="${ambientDensity.toFixed(3)}" data-ambient-motes="${moteCount}" data-ambient-ripples="${ambientRippleCount}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${LAYOUT.height}" width="${width}" height="${LAYOUT.height}" role="img" aria-labelledby="kp-title-${theme.key} kp-desc-${theme.key}" data-ambient-density="${ambientDensity.toFixed(3)}" data-ambient-motes="${moteActivity.toFixed(3)}" data-ambient-ripples="${ambientRippleActivity.toFixed(3)}">` +
     `<title id="kp-title-${theme.key}">${owner ? `${escapeXML(owner)}'s ` : ''}Contribution koi pond</title>` +
     `<desc id="kp-desc-${theme.key}">${plan.eats.length} contribution plankton grazed by ${plan.fishes.length} fish in a deterministic animated ecosystem${context.provenance ? `, cryptographically linked at revision ${context.provenance.revision}` : ''}.${environmentDescription}</desc>` +
     provenance +
@@ -775,8 +775,8 @@ ${turtleScene.css}
       environment?.currentDirection ?? 1,
       environment?.currentStrength ?? 0.5,
     ) +
-    ambientRipples(width, theme, r, ambientRippleCount) +
-    motes(width, theme, r, moteCount) +
+    ambientRipples(width, theme, r, ambientRippleActivity) +
+    motes(width, theme, r, moteActivity) +
     `<rect class="night" width="${width}" height="${LAYOUT.height}" rx="10" fill="${theme.nightTint}"/>` +
     `</svg>`
 

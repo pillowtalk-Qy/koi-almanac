@@ -9,6 +9,7 @@ import {
   validateHealth,
   validateProfileDelivery,
   validateProfilePresentation,
+  validateProfileWorkflow,
   validateProductionArtifacts,
 } from '../src/synthetic-monitor'
 
@@ -72,5 +73,17 @@ describe('synthetic production monitor contracts', () => {
       'access-control-allow-origin': '*',
       'content-security-policy': "default-src 'none'; sandbox",
     }))
+  })
+
+  it('requires the Profile workflow to resolve and execute the published release SHA', () => {
+    const workflow = `repository: pillowtalk-Qy/koi-almanac
+ref: main
+sparse-checkout: release.json
+ref: \${{ steps.release.outputs.sha }}
+uses: ./.koi-almanac
+generator_sha: \${{ steps.release.outputs.sha }}`
+    validateProfileWorkflow(workflow)
+    expect(() => validateProfileWorkflow(workflow.replace('uses: ./.koi-almanac', 'uses: ./wrong-generator')))
+      .toThrow(/checked-out generator/)
   })
 })

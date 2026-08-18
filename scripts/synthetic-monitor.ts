@@ -6,6 +6,7 @@ import {
   validateHealth,
   validateProfileDelivery,
   validateProfilePresentation,
+  validateProfileWorkflow,
   validateProductionArtifacts,
 } from '../src/synthetic-monitor'
 import type { PondGenerator } from '../src/state'
@@ -18,6 +19,7 @@ interface MonitorConfig {
   timezoneOffsetMinutes: number
   profilePage: string
   profileReadme: string
+  profileWorkflow: string
   profileSvg: string
   profileState: string
 }
@@ -35,7 +37,7 @@ interface Retrieved {
 const root = process.cwd()
 const config = JSON.parse(readFileSync(resolve(root, 'monitor.json'), 'utf8')) as MonitorConfig
 const release = JSON.parse(readFileSync(resolve(root, 'release.json'), 'utf8')) as ReleaseManifest
-if (config.schemaVersion !== 2 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
+if (config.schemaVersion !== 3 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
 
 const wait = (milliseconds: number) => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
 
@@ -110,13 +112,15 @@ const dayCount = validateContributions(JSON.parse(contributions.body))
 
 const profileExplorer = new URL(config.explorer)
 profileExplorer.searchParams.set('user', config.syntheticUser)
-const [profilePage, profileReadme, profileSvg, profileState] = await Promise.all([
+const [profilePage, profileReadme, profileWorkflow, profileSvg, profileState] = await Promise.all([
   retrieve('rendered github profile', config.profilePage, 'text/html'),
   retrieve('profile readme', config.profileReadme, 'text/plain'),
+  retrieve('profile workflow', config.profileWorkflow, 'text/plain', { maximumBytes: 100_000 }),
   retrieve('profile svg', config.profileSvg, 'image/svg+xml'),
   retrieve('profile state', config.profileState, 'application/json', { maximumBytes: 1_000_000 }),
 ])
 validateProfilePresentation(profilePage.body, profileReadme.body, config.profileSvg, profileExplorer.href)
+validateProfileWorkflow(profileWorkflow.body)
 validateProfileDelivery(profileSvg.response.headers)
 const state = validateProductionArtifacts(
   profileSvg.body,
