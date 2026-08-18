@@ -2,7 +2,7 @@ import { LAYOUT } from '../layout'
 import { iceFloeBoundaryPoints, iceFloeLayout, lilyPadLayout, type IceFloeSpec } from '../ecology'
 import { rng } from '../prng'
 import { f1 } from '../util'
-import type { Theme } from './palette'
+import { mixColor, type Theme } from './palette'
 
 /** Shared soft-blur filter used by caustics, god rays and the surface sheen. */
 export const SOFT_FILTER =
@@ -130,17 +130,18 @@ export function moonWaterLight(
 
 /** Bright band along the top edge so the water reads as a surface seen from above. */
 export function surfaceSheen(width: number, theme: Theme, intensity = 1): string {
+  const edgeOpacity = 0.5 + theme.lightLevel * 0.25
   return (
     `<g opacity="${f1(intensity)}"><rect width="${width}" height="34" fill="url(#sheenG)"/>` +
-    `<rect width="${width}" height="2.5" fill="${theme.sheen}" opacity="${theme.key === 'dark' ? 0.5 : 0.75}"/></g>`
+    `<rect width="${width}" height="2.5" fill="${theme.sheen}" opacity="${f1(edgeOpacity)}"/></g>`
   )
 }
 
 /** Darkening toward the bottom for depth. */
 export function deepShade(width: number, theme: Theme): string {
-  const height = theme.key === 'light' ? 48 : 66
-  const opacity = theme.key === 'light' ? 0.68 : 0.82
-  return `<rect y="${LAYOUT.height - height}" width="${width}" height="${height}" fill="url(#deepG)" opacity="${opacity}"/>`
+  const height = 66 - theme.lightLevel * 18
+  const opacity = 0.82 - theme.lightLevel * 0.14
+  return `<rect y="${f1(LAYOUT.height - height)}" width="${width}" height="${f1(height)}" fill="url(#deepG)" opacity="${f1(opacity)}"/>`
 }
 
 export function caustics(width: number, theme: Theme): string {
@@ -577,6 +578,7 @@ interface LotusDrift {
   surfaceActivity: number
   daylight: number
   index: number
+  intensity?: number
 }
 
 function lotusDriftAttributes(motion: LotusDrift): string {
@@ -584,16 +586,17 @@ function lotusDriftAttributes(motion: LotusDrift): string {
   const strength = clamp01(motion.currentStrength)
   const surface = clamp01(motion.surfaceActivity)
   const daylight = clamp01(motion.daylight)
+  const intensity = clamp01(motion.intensity ?? 1)
   const daylightFactor = 0.62 + daylight * 0.38
-  const amplitude = (2.6 + strength * 2.8) * (0.78 + surface * 0.22) * daylightFactor
-  const vertical = (0.82 + surface * 0.92) * (0.7 + daylight * 0.3)
+  const amplitude = (2.6 + strength * 2.8) * (0.78 + surface * 0.22) * daylightFactor * intensity
+  const vertical = (0.82 + surface * 0.92) * (0.7 + daylight * 0.3) * intensity
   const x0 = -direction * amplitude * 0.38
   const x1 = direction * amplitude * 0.2
   const x2 = direction * amplitude
   const y0 = -vertical * (motion.index % 2 === 0 ? 0.28 : 0.12)
   const y1 = vertical * (motion.index % 2 === 0 ? 0.74 : 1)
   const y2 = -vertical * (motion.index % 2 === 0 ? 0.44 : 0.62)
-  const tilt = direction * (0.65 + surface * 0.65)
+  const tilt = direction * (0.65 + surface * 0.65) * intensity
   const duration = 8.4 + motion.index * 1.3 + (1 - strength) * 2.2
   const delay = 1.3 + motion.index * 3.1
   return (
@@ -696,9 +699,9 @@ export function autumnMapleLeaves(
 ): string {
   if (intensity < 0.08) return ''
   const r = rng(`maple:${seed}`)
-  const colors = theme.key === 'dark'
-    ? ['#a95143', '#b8733e', '#98743d']
-    : ['#d85c42', '#e5833d', '#c69a45']
+  const nightColors = ['#a95143', '#b8733e', '#98743d']
+  const dayColors = ['#d85c42', '#e5833d', '#c69a45']
+  const colors = nightColors.map((color, index) => mixColor(color, dayColors[index], theme.lightLevel))
   let leaves = ''
   for (let index = 0; index < 8; index++) {
     const x = 58 + r() * (width - 116)
@@ -752,10 +755,10 @@ export function winterIce(
   if (coverage < 0.18) return ''
   const floes = iceFloeLayout(width, seed, coverage)
   const visibleCoverage = Math.min(1, (coverage - 0.18) / 0.82)
-  const fill = theme.key === 'dark' ? 'rgba(157,211,225,0.38)' : 'rgba(229,247,250,0.82)'
-  const rim = theme.key === 'dark' ? 'rgba(191,236,245,0.55)' : 'rgba(255,255,255,0.9)'
-  const snow = theme.key === 'dark' ? 'rgba(225,246,250,0.5)' : 'rgba(255,255,255,0.9)'
-  const crack = theme.key === 'dark' ? 'rgba(211,244,250,0.3)' : 'rgba(74,137,154,0.32)'
+  const fill = mixColor('rgba(157,211,225,0.38)', 'rgba(229,247,250,0.82)', theme.lightLevel)
+  const rim = mixColor('rgba(191,236,245,0.55)', 'rgba(255,255,255,0.9)', theme.lightLevel)
+  const snow = mixColor('rgba(225,246,250,0.5)', 'rgba(255,255,255,0.9)', theme.lightLevel)
+  const crack = mixColor('rgba(211,244,250,0.3)', 'rgba(74,137,154,0.32)', theme.lightLevel)
   const r = rng(`snow:${seed}`)
   const elements = floes.map((floe, index) => {
     const path = smoothIcePath(floe, seed, index)

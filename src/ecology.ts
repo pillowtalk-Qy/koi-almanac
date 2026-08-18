@@ -185,20 +185,23 @@ export function pondObstacleLayout(
       kind: 'lily' as const,
     }))
 
-  const ice = iceFloeLayout(width, seed, environment?.iceCoverage ?? 0).flatMap((floe, index) => {
+  const iceCoverage = environment?.iceCoverage ?? 0
+  const iceObstacleStrength = Math.max(0, Math.min(1, (iceCoverage - 0.18) / 0.82))
+  const iceObstacleScale = Math.sqrt(iceObstacleStrength)
+  const ice = iceFloeLayout(width, seed, iceCoverage).flatMap((floe, index) => {
     const angle = (floe.rotation * Math.PI) / 180
     const core = [-0.55, 0, 0.55].map(offset => ({
       x: floe.x + Math.cos(angle) * floe.rx * offset,
       y: floe.y + Math.sin(angle) * floe.rx * offset,
-      radius: floe.ry * 0.72,
+      radius: floe.ry * 0.72 * iceObstacleScale,
       kind: 'ice' as const,
     }))
     const edge = iceFloeWorldBoundaryPoints(floe, seed, index).map(point => ({
       ...point,
-      radius: 2.5,
+      radius: 2.5 * iceObstacleScale,
       kind: 'ice' as const,
     }))
-    return [...core, ...edge]
+    return [...core, ...edge].filter(obstacle => obstacle.radius > 0.2)
   })
   return [...lilies, ...ice]
 }

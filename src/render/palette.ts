@@ -9,6 +9,7 @@ export interface KoiVariantColors {
 
 export interface Theme {
   key: 'light' | 'dark'
+  lightLevel: number
   waterTop: string
   waterMid: string
   waterBottom: string
@@ -42,6 +43,7 @@ export interface Theme {
 export const THEMES: Record<'light' | 'dark', Theme> = {
   light: {
     key: 'light',
+    lightLevel: 1,
     waterTop: '#a8e4ee',
     waterMid: '#5fb6cb',
     waterBottom: '#4193ab',
@@ -77,6 +79,7 @@ export const THEMES: Record<'light' | 'dark', Theme> = {
   },
   dark: {
     key: 'dark',
+    lightLevel: 0,
     waterTop: '#0d2c42',
     waterMid: '#071c2e',
     waterBottom: '#010810',
@@ -273,7 +276,7 @@ const parseColor = (value: string): Rgba => {
 const formatColor = ({ r, g, b, a }: Rgba) =>
   `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${Number(a.toFixed(3))})`
 
-const mixColor = (from: string, to: string, amount: number) => {
+export const mixColor = (from: string, to: string, amount: number) => {
   const a = parseColor(from)
   const b = parseColor(to)
   return formatColor({
@@ -363,6 +366,7 @@ function blendTheme(from: Theme, to: Theme, amount: number): Theme {
   })
   return {
     key: amount >= 0.46 ? 'light' : 'dark',
+    lightLevel: amount,
     waterTop: mixColor(from.waterTop, to.waterTop, amount),
     waterMid: mixColor(from.waterMid, to.waterMid, amount),
     waterBottom: mixColor(from.waterBottom, to.waterBottom, amount),
@@ -426,19 +430,17 @@ export function themeForEnvironment(environment: PondEnvironment): Theme {
   theme.mote = mixColor(theme.mote, '#e9f9ff', moonAmount * 0.18)
   theme.night = Math.max(0.12, theme.night * (1 - moonAmount * 0.2))
 
-  const daylightFish = environment.solarAltitude >= 2
-  theme.koi = daylightFish ? dayTheme.koi : THEMES.dark.koi
-  theme.minnow = daylightFish ? dayTheme.minnow : THEMES.dark.minnow
-  theme.halo = environment.solarAltitude < -4 ? THEMES.dark.halo : null
-  if (daylightFish) {
-    const shadowReach = 3.2 + environment.goldenLight * 2.8
-    const shadowX = 0.8 - environment.sunDirection * shadowReach
-    const shadowY = 2.8 + environment.goldenLight * 2.4
-    const shadowBlur = 3.1 + environment.goldenLight * 0.8
-    const shadowOpacity = 0.18 + environment.goldenLight * 0.1
-    theme.fishFilter = `<filter id="fx" filterUnits="userSpaceOnUse" x="-70" y="-70" width="240%" height="240%"><feDropShadow dx="${shadowX.toFixed(1)}" dy="${shadowY.toFixed(1)}" stdDeviation="${shadowBlur.toFixed(1)}" flood-color="#063340" flood-opacity="${shadowOpacity.toFixed(2)}"/></filter>`
-  } else {
-    theme.fishFilter = THEMES.dark.fishFilter
-  }
+  const fishDaylight = environment.daylight
+  const shadowReach = 3.2 + environment.goldenLight * 2.8
+  const dayShadowX = 0.8 - environment.sunDirection * shadowReach
+  const dayShadowY = 2.8 + environment.goldenLight * 2.4
+  const dayShadowBlur = 3.1 + environment.goldenLight * 0.8
+  const dayShadowOpacity = 0.18 + environment.goldenLight * 0.1
+  const shadowX = dayShadowX * fishDaylight
+  const shadowY = dayShadowY * fishDaylight
+  const shadowBlur = 5 + (dayShadowBlur - 5) * fishDaylight
+  const shadowOpacity = 0.8 + (dayShadowOpacity - 0.8) * fishDaylight
+  const shadowColor = mixColor('#22d3ee', '#063340', fishDaylight)
+  theme.fishFilter = `<filter id="fx" filterUnits="userSpaceOnUse" x="-70" y="-70" width="240%" height="240%"><feDropShadow dx="${shadowX.toFixed(1)}" dy="${shadowY.toFixed(1)}" stdDeviation="${shadowBlur.toFixed(1)}" flood-color="${shadowColor}" flood-opacity="${shadowOpacity.toFixed(2)}"/></filter>`
   return theme
 }

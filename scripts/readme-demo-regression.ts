@@ -82,8 +82,8 @@ try {
   const springNightIndex = scenes.findIndex(scene => scene.season === 'spring' && scene.phase === 'night')
   const springDayTime = (springDayIndex * slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), springDayTime)
-  const springPlantSelector = `.readme-demo-scene-${springDayIndex} .rd${springDayIndex}-spring-plant`
-  const springBubbleSelector = `.readme-demo-scene-${springDayIndex} .rd${springDayIndex}-spring-bubble`
+  const springPlantSelector = `.readme-demo-scene-${springDayIndex} .spring-plant`
+  const springBubbleSelector = `.readme-demo-scene-${springDayIndex} .spring-bubble`
   const springPopulation = await page.$eval(`.readme-demo-scene-${springDayIndex}`, scene => ({
     clusters: scene.querySelectorAll('[data-spring-cluster]').length,
     bubbles: scene.querySelectorAll('[data-spring-bubble]').length,
@@ -143,7 +143,7 @@ try {
   const summerDayTime = (summerDayIndex * slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), summerDayTime)
   const lotusSelector =
-    `.readme-demo-scene-${summerDayIndex} .rd${summerDayIndex}-summer-lotus-drift[data-lotus-motion="current-drift"]`
+    `.readme-demo-scene-${summerDayIndex} .summer-lotus-drift[data-lotus-motion="current-drift"]`
   const lotusMotion = await page.$eval(lotusSelector, element => ({
     direction: Number(element.getAttribute('data-lotus-current')),
     amplitude: Number(element.getAttribute('data-lotus-drift-x')),
@@ -172,12 +172,12 @@ try {
 
   const summerNightTime = (summerNightIndex * slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), summerNightTime)
-  const nightLotus = await page.$eval(`.readme-demo-scene-${summerNightIndex}`, (scene, prefix) => {
+  const nightLotus = await page.$eval(`.readme-demo-scene-${summerNightIndex}`, scene => {
     const sleeping = scene.querySelectorAll('[data-lotus-state="sleeping"][data-lotus-openness="0.120"]').length
     const buds = scene.querySelectorAll('[data-lotus-form="closed-bud"]').length
     const topDownBuds = scene.querySelectorAll('[data-lotus-view="top-down-folded"]').length
-    const openStage = scene.querySelector(`.${prefix}-lotus-open-stage`)
-    const bud = scene.querySelector(`.${prefix}-summer-lotus-bud`)
+    const openStage = scene.querySelector('.lotus-open-stage')
+    const bud = scene.querySelector('.summer-lotus-bud')
     return {
       sleeping,
       buds,
@@ -185,14 +185,14 @@ try {
       openOpacity: openStage ? Number(getComputedStyle(openStage).opacity) : 1,
       budOpacity: bud ? Number(getComputedStyle(bud).opacity) : 0,
     }
-  }, `rd${summerNightIndex}`)
+  })
   if (
     nightLotus.sleeping < 3 || nightLotus.buds < 3 || nightLotus.topDownBuds < 3 ||
     nightLotus.openOpacity > 0.02 || nightLotus.budOpacity < 0.75
   ) {
     throw new Error(`README summer night lotus is not closed: ${JSON.stringify(nightLotus)}`)
   }
-  const nightLotusSelector = `.readme-demo-scene-${summerNightIndex} .rd${summerNightIndex}-summer-lotus-drift[data-lotus-motion="current-drift"]`
+  const nightLotusSelector = `.readme-demo-scene-${summerNightIndex} .summer-lotus-drift[data-lotus-motion="current-drift"]`
   const seekNightLotus = async (progress: number) => {
     return await page.$eval(nightLotusSelector, (element, value) => {
       const animation = element.getAnimations()[0]
@@ -238,7 +238,7 @@ try {
 
   const motionTime = (3 * slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), motionTime)
-  const fishSelector = '.readme-demo-scene-3 .f0'
+  const fishSelector = '#readme-fish-0 .f0'
   const transformBefore = await page.$eval(fishSelector, element => getComputedStyle(element).transform)
   const before = await page.screenshot({ type: 'png', omitBackground: true }) as Buffer
   await page.evaluate(() => {

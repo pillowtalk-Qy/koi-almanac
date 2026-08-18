@@ -1,7 +1,7 @@
 import { rng } from '../prng'
 import { f2 } from '../util'
 import type { FishPlan, Point } from '../types'
-import type { Theme } from './palette'
+import { mixColor, type Theme } from './palette'
 
 function radiusProfile(n: number, peakAt: number, nose: number, peak: number, tip: number): number[] {
   const out: number[] = []
@@ -65,7 +65,7 @@ export function fishSVG(
     base = theme.minnow[f.id % theme.minnow.length]
     band = base
     fin = base
-    eye = theme.key === 'dark' ? theme.waterTop : '#26221e'
+    eye = mixColor(theme.waterTop, '#26221e', theme.lightLevel)
   }
 
   const bandStart = 5 + Math.floor(rf() * 3)
@@ -74,29 +74,29 @@ export function fishSVG(
   const b2Start = 14 + Math.floor(rf() * 2)
 
   const segFill = (i: number) => {
-    if (!isKoi) return base
-    if (i >= bandStart && i < bandEnd) return band
-    if (band2 && i >= b2Start && i < b2Start + 3) return band
-    return base
+    if (!isKoi) return 'var(--fish-base)'
+    if (i >= bandStart && i < bandEnd) return 'var(--fish-band)'
+    if (band2 && i >= b2Start && i < b2Start + 3) return 'var(--fish-band)'
+    return 'var(--fish-base)'
   }
   const segOpacity = (i: number) => Math.min(0.94, 0.86 * Math.pow(1 - i / (N - 1), 1.05) + 0.15)
 
-  const ridge = theme.key === 'dark' ? '#e6fbff' : '#0a2430'
-  const ridgeOp = theme.key === 'dark' ? 0.17 : 0.13
+  const ridge = mixColor('#e6fbff', '#0a2430', theme.lightLevel)
+  const ridgeOp = 0.17 - theme.lightLevel * 0.04
   let trail = ''
   for (let i = N - 1; i >= 0; i--) {
     const d = positionStyle(staticTrail[i], delayForLag(i * lag))
     trail += `<circle class="${cls}"${d} r="${f2(radii[i] * f.size)}" fill="${segFill(i)}" fill-opacity="${f2(segOpacity(i))}"/>`
     if (isKoi && i >= 2 && i <= 13) {
-      trail += `<circle class="${cls}"${d} r="${f2(radii[i] * f.size * 0.42)}" fill="${ridge}" fill-opacity="${f2(ridgeOp)}"/>`
+      trail += `<circle class="${cls}"${d} r="${f2(radii[i] * f.size * 0.42)}" fill="var(--fish-ridge)" fill-opacity="var(--fish-ridge-opacity)"/>`
     }
   }
 
   const shoulder = f2(radii[4] * f.size + 1.6)
   const pecs = isKoi
     ? `<g class="${cls}"${positionStyle(fishPointAt(f, staticTime - 3 * lag, duration), delayForLag(3 * lag))}>` +
-      `<ellipse class="pt" cx="0" cy="-${shoulder}" rx="${f2(3.1 * f.size)}" ry="${f2(1.4 * f.size)}" fill="${fin}"/>` +
-      `<ellipse class="pb" cx="0" cy="${shoulder}" rx="${f2(3.1 * f.size)}" ry="${f2(1.4 * f.size)}" fill="${fin}"/>` +
+      `<ellipse class="pt" cx="0" cy="-${shoulder}" rx="${f2(3.1 * f.size)}" ry="${f2(1.4 * f.size)}" fill="var(--fish-fin)"/>` +
+      `<ellipse class="pb" cx="0" cy="${shoulder}" rx="${f2(3.1 * f.size)}" ry="${f2(1.4 * f.size)}" fill="var(--fish-fin)"/>` +
       `</g>`
     : ''
 
@@ -105,7 +105,7 @@ export function fishSVG(
       fishPointAt(f, staticTime - (N - 0.3) * lag, duration),
       delayForLag((N - 0.3) * lag),
     )}>` +
-    `<ellipse class="tf" rx="${f2((isKoi ? 3.8 : 2) * f.size)}" ry="${f2((isKoi ? 1.5 : 0.9) * f.size)}" fill="${fin}" fill-opacity="0.8"/>` +
+    `<ellipse class="tf" rx="${f2((isKoi ? 3.8 : 2) * f.size)}" ry="${f2((isKoi ? 1.5 : 0.9) * f.size)}" fill="var(--fish-fin)" fill-opacity="0.8"/>` +
     `</g>`
 
   const eo = f2(2.3 * f.size)
@@ -113,10 +113,14 @@ export function fishSVG(
   const glint = f2(er * 0.38)
   const eyes =
     `<g class="${cls}"${positionStyle(staticTrail[0])}>` +
-    `<circle cy="-${eo}" r="${er}" fill="${eye}"/><circle cy="${eo}" r="${er}" fill="${eye}"/>` +
+    `<circle cy="-${eo}" r="${er}" fill="var(--fish-eye)"/><circle cy="${eo}" r="${er}" fill="var(--fish-eye)"/>` +
     `<circle cx="${glint}" cy="-${f2(eo + glint * 0.6)}" r="${glint}" fill="#ffffff" fill-opacity="0.85"/>` +
     `<circle cx="${glint}" cy="${f2(eo - glint * 0.6)}" r="${glint}" fill="#ffffff" fill-opacity="0.85"/>` +
     `</g>`
 
-  return `${pecs}${tailFin}<g filter="url(#fx)">${trail}</g>${eyes}`
+  const variables =
+    `--fish-base:${base};--fish-band:${band};--fish-fin:${fin};--fish-eye:${eye};` +
+    `--fish-ridge:${ridge};--fish-ridge-opacity:${f2(ridgeOp)};--fish-filter:url(#fx)`
+  return `<g data-fish-id="${f.id}" style="${variables}">` +
+    `${pecs}${tailFin}<g style="filter:var(--fish-filter)">${trail}</g>${eyes}</g>`
 }

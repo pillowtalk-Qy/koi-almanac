@@ -125,10 +125,20 @@ const svgs: Record<ViewMode, string> = { auto: '', light: '', dark: '' }
 let active: ViewMode = 'auto'
 let currentGrid: Grid | null = null
 let currentPlan: Plan | null = null
+let committedAutoPlan: Plan | null = null
 let currentUser = ''
 let pondSwapTimer: number | undefined
 let pondTransitionRevision = 0
 let environmentFrame: number | undefined
+let environmentPreviewTimer: number | undefined
+let lastEnvironmentPreview = -Infinity
+
+const ENVIRONMENT_PREVIEW_INTERVAL = 80
+const PERSISTENT_POND_MOTION = /^(?:fp\d+|turtle(?:-.+)?)$/
+
+interface PondMotionPhase {
+  phase: number
+}
 
 const pad = (value: number) => String(value).padStart(2, '0')
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
@@ -190,12 +200,15 @@ function selectedEnvironment(): PondEnvironment {
   return deriveEnvironment(momentFromText(date.value, time.value))
 }
 
-function renderAuto() {
+function renderAuto(preview = false) {
   if (!currentGrid || !currentPlan) return
   if (live.checked) updateLiveInputs()
   else syncEnvironmentTimelines()
   const environment = selectedEnvironment()
-  const environmentPlan = plan(currentGrid, currentUser, undefined, environment)
+  const environmentPlan = preview && committedAutoPlan
+    ? committedAutoPlan
+    : plan(currentGrid, currentUser, undefined, environment)
+  if (!preview) committedAutoPlan = environmentPlan
   svgs.auto = renderSVG(
     currentGrid,
     environmentPlan,
@@ -214,28 +227,76 @@ function renderAuto() {
 }
 
 function scheduleEnvironmentPreview() {
-  if (environmentFrame !== undefined) return
-  environmentFrame = window.requestAnimationFrame(() => {
+  if (environmentPreviewTimer !== undefined || environmentFrame !== undefined) return
+  const wait = Math.max(0, ENVIRONMENT_PREVIEW_INTERVAL - (performance.now() - lastEnvironmentPreview))
+  environmentPreviewTimer = window.setTimeout(() => {
+    environmentPreviewTimer = undefined
+    environmentFrame = window.requestAnimationFrame(() => {
+      environmentFrame = undefined
+      lastEnvironmentPreview = performance.now()
+      if (active === 'auto') show('auto', false, true)
+      syncURL()
+    })
+  }, wait)
+}
+
+function finishEnvironmentPreview() {
+  if (environmentPreviewTimer !== undefined) {
+    window.clearTimeout(environmentPreviewTimer)
+    environmentPreviewTimer = undefined
+  }
+  if (environmentFrame !== undefined) {
+    window.cancelAnimationFrame(environmentFrame)
     environmentFrame = undefined
-    if (active === 'auto') show('auto')
-    syncURL()
-  })
+  }
+  lastEnvironmentPreview = performance.now()
+  if (active === 'auto') show('auto', true)
+  syncURL()
+}
+
+function pondMotionPhases(): Map<string, PondMotionPhase> {
+  const phases = new Map<string, PondMotionPhase>()
+  for (const animation of pond.getAnimations({ subtree: true })) {
+    const name = 'animationName' in animation ? String(animation.animationName) : ''
+    if (!PERSISTENT_POND_MOTION.test(name) || phases.has(name)) continue
+    const currentTime = Number(animation.currentTime)
+    const duration = Number(animation.effect?.getTiming().duration)
+    if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) continue
+    phases.set(name, {
+      phase: ((currentTime % duration) + duration) % duration / duration,
+    })
+  }
+  return phases
+}
+
+function restorePondMotion(phases: Map<string, PondMotionPhase>) {
+  if (phases.size === 0) return
+  for (const animation of pond.getAnimations({ subtree: true })) {
+    const name = 'animationName' in animation ? String(animation.animationName) : ''
+    const previous = phases.get(name)
+    if (!previous) continue
+    const duration = Number(animation.effect?.getTiming().duration)
+    if (!Number.isFinite(duration) || duration <= 0) continue
+    animation.currentTime = previous.phase * duration
+  }
 }
 
 function mountPond(mode: ViewMode) {
+  const motionPhases = pondMotionPhases()
   pond.innerHTML = svgs[mode]
   const svg = pond.querySelector('svg')
   if (svg) {
     svg.removeAttribute('width')
     svg.removeAttribute('height')
   }
+  restorePondMotion(motionPhases)
   download.href = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgs[mode])))}`
   download.download = `koi-almanac-${mode}.svg`
 }
 
-function show(mode: ViewMode, animate = false) {
+function show(mode: ViewMode, animate = false, preview = false) {
   active = mode
-  if (mode === 'auto') renderAuto()
+  if (mode === 'auto') renderAuto(preview)
   for (const b of tabs.querySelectorAll('button')) {
     b.classList.toggle('on', b.dataset.theme === mode)
   }
@@ -281,6 +342,7 @@ async function generate(user: string) {
     const p = plan(grid, user)
     currentGrid = grid
     currentPlan = p
+    committedAutoPlan = null
     currentUser = user
     svgs.light = renderSVG(grid, p, THEMES.light, user).svg
     svgs.dark = renderSVG(grid, p, THEMES.dark, user).svg
@@ -358,6 +420,11 @@ dayTimeline.addEventListener('input', () => {
   syncEnvironmentTimelines()
   scheduleEnvironmentPreview()
 })
+
+for (const timeline of [yearTimeline, dayTimeline]) {
+  timeline.addEventListener('change', finishEnvironmentPreview)
+  timeline.addEventListener('pointercancel', finishEnvironmentPreview)
+}
 
 document.querySelectorAll<HTMLButtonElement>('.season-jump').forEach(button => {
   button.addEventListener('click', () => {

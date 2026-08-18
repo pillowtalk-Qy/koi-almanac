@@ -35,6 +35,10 @@ import type { Theme } from './palette'
 const PLANKTON_R = [0, 2.1, 2.8, 3.5, 4.2]
 const TURTLE_STREAK = 30
 const LOTUS_GAP = 21
+const smoothAmount = (edge0: number, edge1: number, value: number) => {
+  const amount = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
+  return amount * amount * (3 - 2 * amount)
+}
 
 export interface RenderMeta {
   plankton: number
@@ -49,6 +53,7 @@ export interface RenderContext {
   provenance?: PondProvenance
   highlightedCells?: ReadonlySet<number>
   environment?: PondEnvironment
+  staticTime?: number
 }
 
 const pct = (t: number, duration: number) => ((t / duration) * 100).toFixed(2)
@@ -112,7 +117,7 @@ function fishKeyframes(
   return css
 }
 
-function bestStaticTime(plan: Plan, width: number, seed: string, environment?: PondEnvironment): number {
+export function bestStaticTime(plan: Plan, width: number, seed: string, environment?: PondEnvironment): number {
   const obstacles = pondObstacleLayout(width, seed, environment)
   let best = { score: -Infinity, time: plan.duration * 0.5 }
 
@@ -151,6 +156,7 @@ interface TurtleChoreography {
   css: string
   effects: string
   delay: number
+  iceAction: number
   checkpoints: null | {
     entry: number
     mount: number
@@ -183,9 +189,12 @@ function turtleChoreography(
         `.snow-track{opacity:0}`,
       effects: '',
       delay: 0,
+      iceAction: 0,
       checkpoints: null,
     }
   }
+  const iceAction = smoothAmount(0.18, 0.72, environment?.iceCoverage ?? 0)
+  const transitY = turtleY - 6 * iceAction
   const percentAt = (x: number) => Math.max(0, Math.min(100, ((x + 40) / (width + 80)) * 100))
   const percent = (value: number) => value.toFixed(2)
   const entry = iceFloeSideContact(floe, seed, 1, 'left')
@@ -201,22 +210,26 @@ function turtleChoreography(
   const clampHeading = (value: number) => Math.max(-12, Math.min(12, value))
   const heading = (x: number, y: number) => clampHeading((Math.atan2(y, x) * 180) / Math.PI)
   const poseAngle = (value: number) => f1(Math.max(-20, Math.min(20, value)))
-  const entryApproach = waterPoint(entry, 34, turtleY - 6)
-  const entryContact = waterPoint(entry, 16, turtleY - 2)
-  const entryLift = waterPoint(entry, 7, turtleY - 4)
-  const entryMount = alongNormal(entry, -10)
-  const entryWalk = alongNormal(entry, -24)
-  const exitBrace = alongNormal(exit, -25)
-  const exitPush = alongNormal(exit, -11)
-  const exitAir = waterPoint(exit, 2, turtleY - 6)
-  const exitImpact = waterPoint(exit, 12, turtleY - 2)
-  const exitSplash = waterPoint(exit, 19, turtleY - 4)
+  const withIceAction = (point: { x: number; y: number }) => ({
+    x: point.x,
+    y: turtleY + (point.y - turtleY) * iceAction,
+  })
+  const entryApproach = withIceAction(waterPoint(entry, 34, turtleY - 6))
+  const entryContact = withIceAction(waterPoint(entry, 16, turtleY - 2))
+  const entryLift = withIceAction(waterPoint(entry, 7, turtleY - 4))
+  const entryMount = withIceAction(alongNormal(entry, -10))
+  const entryWalk = withIceAction(alongNormal(entry, -24))
+  const exitBrace = withIceAction(alongNormal(exit, -25))
+  const exitPush = withIceAction(alongNormal(exit, -11))
+  const exitAir = withIceAction(waterPoint(exit, 2, turtleY - 6))
+  const exitImpact = withIceAction(waterPoint(exit, 12, turtleY - 2))
+  const exitSplash = withIceAction(waterPoint(exit, 19, turtleY - 4))
   const exitSubmergeBase = alongNormal(exit, 27)
-  const exitSubmerge = {
+  const exitSubmerge = withIceAction({
     x: exitSubmergeBase.x,
     y: Math.min(turtleY + 1, Math.max(exitSplash.y + 4, exitSubmergeBase.y)),
-  }
-  const exitDepart = waterPoint(exit, 43, turtleY - 6)
+  })
+  const exitDepart = withIceAction(waterPoint(exit, 43, turtleY - 6))
   const entryHeading = heading(-entry.normalX, -entry.normalY)
   const walkHeading = heading(exitBrace.x - entryWalk.x, exitBrace.y - entryWalk.y)
   const exitHeading = heading(exit.normalX, exit.normalY)
@@ -234,12 +247,19 @@ function turtleChoreography(
   const submerge = splash + 1.45
   const depart = Math.max(submerge + 1.8, percentAt(exitDepart.x))
   const initialX = Math.max(48, width * 0.07)
-  const initialDelay = (percentAt(initialX) / 100) * duration
-  const transitY = turtleY - 6
+  const initialDelay = (percentAt(initialX) / 100) * duration * iceAction
   const delayCSS = `-${f1(initialDelay)}s`
   const frame = (at: number, x: number, y: number, easing = 'linear') =>
     `${percent(at)}%{transform:translate(${f1(x)}px,${f1(y)}px);animation-timing-function:${easing}}`
   const bodyFrame = (at: number, transform: string) => `${percent(at)}%{transform:${transform}}`
+  const bodyPose = (y: number, angle: number, scaleX = 1, scaleY?: number) => {
+    const x = 1 + (scaleX - 1) * iceAction
+    const scaleValue = (value: number) => String(Number(value.toFixed(2)))
+    const scale = scaleY === undefined
+      ? `scale(${scaleValue(x)})`
+      : `scale(${scaleValue(x)},${scaleValue(1 + (scaleY - 1) * iceAction)})`
+    return `translateY(${f1(y * iceAction)}px) rotate(${poseAngle(angle * iceAction)}deg) ${scale}`
+  }
   const step1 = walkStart + (brace - walkStart) * 0.24
   const step2 = walkStart + (brace - walkStart) * 0.49
   const step3 = walkStart + (brace - walkStart) * 0.74
@@ -251,7 +271,7 @@ function turtleChoreography(
     frame(lift, entryLift.x, entryLift.y, 'ease-in-out') +
     frame(mount, entryMount.x, entryMount.y, 'ease-out') +
     frame(walkStart, entryWalk.x, entryWalk.y, 'linear') +
-    frame(middle, floe.x, floe.y) +
+    frame(middle, floe.x, turtleY + (floe.y - turtleY) * iceAction) +
     frame(brace, exitBrace.x, exitBrace.y, 'linear') +
     frame(push, exitPush.x, exitPush.y, 'ease-in') +
     frame(air, exitAir.x, exitAir.y, 'ease-out') +
@@ -263,19 +283,19 @@ function turtleChoreography(
   const body =
     `@keyframes turtle-body{` +
     `0%,${percent(approach)}%{transform:translateY(0) rotate(0) scale(1)}` +
-    bodyFrame(contact, `translateY(1px) rotate(${poseAngle(entryHeading)}deg) scale(0.98,1.03)`) +
-    bodyFrame(lift, `translateY(-1px) rotate(${poseAngle(entryHeading - 5)}deg) scale(1.05,0.92)`) +
-    bodyFrame(mount, `translateY(-3px) rotate(${poseAngle(entryHeading + 10)}deg) scale(0.88,1.08)`) +
-    bodyFrame(walkStart, `translateY(0) rotate(${poseAngle(walkHeading - 1)}deg) scale(1.02)`) +
-    bodyFrame(step1, `translateY(-1.4px) rotate(${poseAngle(walkHeading + 1.4)}deg) scale(1.03)`) +
-    bodyFrame(step2, `translateY(0) rotate(${poseAngle(walkHeading - 1.2)}deg) scale(1.02)`) +
-    bodyFrame(step3, `translateY(-1.2px) rotate(${poseAngle(walkHeading + 1.2)}deg) scale(1.03)`) +
-    bodyFrame(brace, `translateY(2px) rotate(${poseAngle(exitHeading + 8)}deg) scale(1.06,0.92)`) +
-    bodyFrame(push, `translateY(3px) rotate(${poseAngle(exitHeading + 14)}deg) scale(1.1,0.88)`) +
-    bodyFrame(air, `translateY(-6px) rotate(${poseAngle(exitHeading - 16)}deg) scale(0.88,1.12)`) +
-    bodyFrame(impact, `translateY(2px) rotate(${poseAngle(exitHeading + 14)}deg) scale(1.12,0.86)`) +
-    bodyFrame(splash, `translateY(0) rotate(${poseAngle(exitHeading + 4)}deg) scale(1.05)`) +
-    bodyFrame(submerge, `translateY(2px) rotate(${poseAngle(exitHeading - 2)}deg) scale(1.08,0.86)`) +
+    bodyFrame(contact, bodyPose(1, entryHeading, 0.98, 1.03)) +
+    bodyFrame(lift, bodyPose(-1, entryHeading - 5, 1.05, 0.92)) +
+    bodyFrame(mount, bodyPose(-3, entryHeading + 10, 0.88, 1.08)) +
+    bodyFrame(walkStart, bodyPose(0, walkHeading - 1, 1.02)) +
+    bodyFrame(step1, bodyPose(-1.4, walkHeading + 1.4, 1.03)) +
+    bodyFrame(step2, bodyPose(0, walkHeading - 1.2, 1.02)) +
+    bodyFrame(step3, bodyPose(-1.2, walkHeading + 1.2, 1.03)) +
+    bodyFrame(brace, bodyPose(2, exitHeading + 8, 1.06, 0.92)) +
+    bodyFrame(push, bodyPose(3, exitHeading + 14, 1.1, 0.88)) +
+    bodyFrame(air, bodyPose(-6, exitHeading - 16, 0.88, 1.12)) +
+    bodyFrame(impact, bodyPose(2, exitHeading + 14, 1.12, 0.86)) +
+    bodyFrame(splash, bodyPose(0, exitHeading + 4, 1.05)) +
+    bodyFrame(submerge, bodyPose(2, exitHeading - 2, 1.08, 0.86)) +
     `${percent(depart)}%,100%{transform:translateY(0) rotate(0) scale(1)}}`
   const shadow =
     `@keyframes turtle-shadow{` +
@@ -355,7 +375,7 @@ function turtleChoreography(
     `${percent(exitEvent + 1.45)}%,100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0.2)}}`
   const entryWater = alongNormal(entry, 3)
   const effects =
-    `<g data-pond-part="turtle-water-feedback">` +
+    `<g data-pond-part="turtle-water-feedback" opacity="${iceAction.toFixed(3)}">` +
     `<circle class="turtle-splash turtle-splash-in" cx="${f1(entryWater.x)}" cy="${f1(entryWater.y)}" r="6" fill="none" stroke="${ripple}" stroke-width="1.2"/>` +
     `<circle class="turtle-splash turtle-splash-in" cx="${f1(entryWater.x)}" cy="${f1(entryWater.y)}" r="10" fill="none" stroke="${ripple}" stroke-width="0.8"/>` +
     `<ellipse class="turtle-impact" cx="${f1(exitImpact.x)}" cy="${f1(exitImpact.y)}" rx="8" ry="3" fill="${ripple}"/>` +
@@ -370,6 +390,7 @@ function turtleChoreography(
     css: motion + body + shadow + limbs + tracks + splashes,
     effects,
     delay: initialDelay,
+    iceAction,
     checkpoints: { entry: entryEvent, mount, walk: walkStart, brace, air, impact, splash, submerge },
   }
 }
@@ -389,7 +410,7 @@ export function renderSVG(
   const animationDuration = context.environment
     ? timelineDuration / context.environment.activityRate
     : timelineDuration
-  const staticTime = bestStaticTime(plan, width, seed, context.environment)
+  const staticTime = context.staticTime ?? bestStaticTime(plan, width, seed, context.environment)
   const r = rng('decor:' + seed)
 
   const eatByCell = new Map(plan.eats.map(e => [e.cell, e]))
@@ -406,20 +427,19 @@ export function renderSVG(
     if (id) eatBuckets.add(id)
     const cls = id ? `pk e${id}` : 'pk'
     const rad = PLANKTON_R[c.level]
-    const fill = theme.plankton[c.level - 1]
-    const twinkle = theme.halo && c.level >= 3
-      ? `<circle class="tw" style="animation-delay:-${((c.week * 7 + c.day) % 9) * 0.45}s" cx="${x}" cy="${y}" r="${(rad * 1.8).toFixed(1)}" fill="${theme.halo}" opacity="0.14"/>`
+    const twinkle = c.level >= 3
+      ? `<circle class="tw" style="animation-delay:-${((c.week * 7 + c.day) % 9) * 0.45}s" cx="${x}" cy="${y}" r="${(rad * 1.8).toFixed(1)}" fill="var(--plankton-halo)" opacity="0.14"/>`
       : ''
     planktonEls +=
       `<g class="${cls}">` +
-      `<circle cx="${x}" cy="${y}" r="${(rad * 2.3).toFixed(1)}" fill="url(#pkg${c.level})"/>` +
+      `<circle cx="${x}" cy="${y}" r="${(rad * 2.3).toFixed(1)}" fill="var(--plankton-glow-${c.level})"/>` +
       twinkle +
-      `<circle cx="${x}" cy="${y}" r="${rad}" fill="${fill}"/>` +
+      `<circle cx="${x}" cy="${y}" r="${rad}" fill="var(--plankton-${c.level})"/>` +
       `</g>`
     if (id && eat) {
       const rippleRadius = 4.4 + eat.energy * 0.22 + (highlighted ? 0.8 : 0)
       const rippleWidth = (1 + eat.energy * 0.08) * (highlighted ? 1.35 : 1)
-      rippleEls += `<circle class="rp r${id}${highlighted ? ' fresh' : ''}" cx="${x}" cy="${y}" r="${rippleRadius.toFixed(1)}" fill="none" stroke="${theme.ripple}" stroke-width="${rippleWidth.toFixed(1)}"/>`
+      rippleEls += `<circle class="rp r${id}${highlighted ? ' fresh' : ''}" cx="${x}" cy="${y}" r="${rippleRadius.toFixed(1)}" fill="none" stroke="var(--plankton-ripple)" stroke-width="${rippleWidth.toFixed(1)}"/>`
     }
   }
 
@@ -475,12 +495,13 @@ export function renderSVG(
     : 0.08
   const lightDrift = environment ? -environment.sunDirection * 2.4 : 1.2
   const moonDrift = currentVector * 3.2
+  const lightLevel = theme.lightLevel
   const currentPeak = environment
-    ? (theme.key === 'light' ? 0.14 : 0.07) *
+    ? (0.07 + lightLevel * 0.07) *
       (0.42 + surfaceMotion * 0.58) *
       (0.72 + environment.currentStrength * 0.28) *
       (0.82 + environment.goldenLight * 0.18)
-    : theme.key === 'light' ? 0.14 : 0.07
+    : 0.07 + lightLevel * 0.07
   const currentFloor = currentPeak * 0.5
   const sheenIntensity = environment
     ? Math.min(1, 0.58 + environment.daylight * 0.32 + environment.goldenLight * 0.1)
@@ -495,7 +516,6 @@ export function renderSVG(
   const causticToX = 26 * currentVector
   const moteDriftX = 18 * currentVector
   const currentDuration = 23 - currentStrength * 7
-  const paddleDuration = environment && environment.iceCoverage >= 0.18 ? 1.15 : 1.4
   const turtleDuration = Math.max(36, Math.min(64, animationDuration * 0.6))
   const turtleScene = turtleChoreography(
     width,
@@ -508,9 +528,10 @@ export function renderSVG(
   const turtleFloe = environment && environment.iceCoverage >= 0.18
     ? iceFloeLayout(width, seed, environment.iceCoverage)[1]
     : undefined
-  const turtleRestX = turtleFloe?.x ?? width * 0.58
-  const turtleRestY = turtleFloe ? Math.min(turtleY - 6, turtleFloe.y - 2) : turtleY
-  const turtleWalkingOnIce = Boolean(turtleFloe)
+  const turtleRestX = width * 0.58 + ((turtleFloe?.x ?? width * 0.58) - width * 0.58) * turtleScene.iceAction
+  const floeRestY = turtleFloe ? Math.min(turtleY - 6, turtleFloe.y - 2) : turtleY
+  const turtleRestY = turtleY + (floeRestY - turtleY) * turtleScene.iceAction
+  const paddleDuration = 1.4 - turtleScene.iceAction * 0.25
   const turtleDelay = `-${f1(turtleScene.delay)}s`
   const turtleMotionAttributes = turtleScene.checkpoints
     ? ` data-turtle-duration="${f1(turtleDuration)}" data-turtle-delay="${f1(turtleScene.delay)}"` +
@@ -518,10 +539,10 @@ export function renderSVG(
         .map(([phase, at]) => ` data-turtle-${phase}="${at.toFixed(2)}"`)
         .join('')
     : ''
-  const summerNightActivity = environment?.season === 'summer'
+  const summerNightActivity = environment
     ? environment.summerBloom * environment.nightDepth
     : 0
-  const winterSnowActivity = environment?.season === 'winter'
+  const winterSnowActivity = environment
     ? environment.winterStillness * (0.72 + environment.nightDepth * 0.28)
     : 0
 
@@ -555,7 +576,7 @@ export function renderSVG(
 .sun-path{transform-box:fill-box;transform-origin:center;animation:sun-path 12s ease-in-out infinite alternate}
 .moon-path{transform-box:fill-box;transform-origin:center;animation:moon-path 10.5s ease-in-out infinite alternate}
 .moon-path-b{animation-direction:alternate-reverse;animation-duration:13s}
-.paddle{transform-box:fill-box;transform-origin:center;${turtleWalkingOnIce ? 'animation:none' : `animation:paddle ${paddleDuration}s ease-in-out infinite alternate`}}
+.paddle{transform-box:fill-box;transform-origin:center;animation:paddle ${paddleDuration}s ease-in-out infinite alternate}
 .ca{opacity:${causticOpacity.toFixed(3)};animation:ca 15s ease-in-out infinite alternate}
 .floor{transform-box:fill-box;transform-origin:center;opacity:var(--floor-opacity,0.42);animation-name:floor;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 .current{opacity:${currentPeak.toFixed(3)};animation:current ${currentDuration.toFixed(1)}s ease-in-out infinite alternate}
@@ -625,6 +646,10 @@ ${turtleScene.css}
     : ''
   const lotusPresence = environment?.bloom ?? 1
   const lotusOpenness = environment?.lotusOpenness ?? 1
+  const contributionVariables = theme.plankton
+    .map((color, index) => `--plankton-${index + 1}:${color};--plankton-glow-${index + 1}:url(#pkg${index + 1})`)
+    .join(';') +
+    `;--plankton-halo:${theme.halo ?? 'transparent'};--plankton-ripple:${theme.ripple}`
   const environmentDescription = context.environment
     ? ` It is ${context.environment.phase} in ${context.environment.season}.`
     : ''
@@ -648,8 +673,8 @@ ${turtleScene.css}
     `<stop offset="0" stop-color="${theme.deep}" stop-opacity="0"/><stop offset="1" stop-color="${theme.deep}"/>` +
     `</linearGradient>` +
     `<radialGradient id="floorG" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${theme.floorBlotch}" stop-opacity="${theme.key === 'light' ? 0.14 : 0.09}"/>` +
-    `<stop offset="0.58" stop-color="${theme.floorBlotch}" stop-opacity="${theme.key === 'light' ? 0.06 : 0.045}"/>` +
+    `<stop offset="0" stop-color="${theme.floorBlotch}" stop-opacity="${(0.09 + lightLevel * 0.05).toFixed(3)}"/>` +
+    `<stop offset="0.58" stop-color="${theme.floorBlotch}" stop-opacity="${(0.045 + lightLevel * 0.015).toFixed(3)}"/>` +
     `<stop offset="1" stop-color="${theme.floorBlotch}" stop-opacity="0"/>` +
     `</radialGradient>` +
     `<radialGradient id="sunPathG" cx="0.5" cy="0.5" r="0.5">` +
@@ -688,8 +713,7 @@ ${turtleScene.css}
       environment?.surfaceActivity ?? 1,
       environment?.daylight ?? 1,
     ) +
-    `<g>${planktonEls}</g>` +
-    `<g>${rippleEls}</g>` +
+    `<g data-pond-part="contributions" style="${contributionVariables}"><g>${planktonEls}</g><g>${rippleEls}</g></g>` +
     pebbles(theme, r) +
     `<rect width="${width}" height="${LAYOUT.height}" rx="10" fill="url(#vig)"/>` +
     surfaceSheen(width, theme, sheenIntensity) +
@@ -711,17 +735,18 @@ ${turtleScene.css}
           theme,
           r,
           lotusOpenness,
-          environment?.season === 'summer'
+          environment
             ? {
                 currentDirection,
                 currentStrength,
                 surfaceActivity: environment.surfaceActivity,
                 daylight: environment.daylight,
+                intensity: environment.summerBloom,
               }
             : undefined,
         )}</g>`
       : '') +
-    plan.fishes.map(f => `<g>${fishSVG(f, theme, staticTime, timelineDuration, animationDuration)}</g>`).join('') +
+    plan.fishes.map(f => fishSVG(f, theme, staticTime, timelineDuration, animationDuration)).join('') +
     summerFireflies(width, seed, summerNightActivity, lotusOpenness) +
     autumnMapleLeaves(
       width,
