@@ -49,7 +49,7 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: pillowtalk-Qy/koi-almanac@eb254c005f5d1aeb90602da1fe1590fb51ad121a
+      - uses: pillowtalk-Qy/koi-almanac@ceb9404b4136a94e7778a6395d431bacdaa9dc7a
         with:
           github_user_name: ${'$'}{{ github.repository_owner }}
           outputs: |
