@@ -256,7 +256,11 @@ async function interactionBoundaryRegression(page: Page) {
     await page.waitForSelector('#result:not([hidden])')
     const renderer = await page.evaluate(() => document.documentElement.dataset.renderWorker)
     assert(renderer === 'active', `Explorer used ${renderer ?? 'no'} background renderer`)
-    await delay(250)
+    await page.waitForFunction(() => {
+      const names = new Set(document.getElementById('pond')?.getAnimations({ subtree: true })
+        .map(animation => 'animationName' in animation ? String(animation.animationName) : ''))
+      return names.has('fp0') && names.has('turtle') && names.has('current')
+    }, { timeout: 15_000 })
     await page.evaluate(() => {
       const state = window as typeof window & { __pondMounts?: number }
       state.__pondMounts = 0
