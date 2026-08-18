@@ -1,4 +1,4 @@
-import { exports } from 'cloudflare:workers'
+import { env, exports } from 'cloudflare:workers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 declare module 'cloudflare:workers' {
@@ -29,7 +29,12 @@ describe('privacy-preserving contribution worker', () => {
     }))
     expect(response.status).toBe(200)
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://pillowtalk-qy.github.io')
-    await expect(response.json()).resolves.toEqual({ ok: true, source: 'github.com', logging: 'disabled' })
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      source: 'github.com',
+      logging: 'disabled',
+      snapshot: 'global-kv',
+    })
   })
 
   it('rejects invalid usernames before making an upstream request', async () => {
@@ -118,6 +123,7 @@ describe('privacy-preserving contribution worker', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('X-Koipond-Cache')).toBe('STALE')
     expect(response.headers.get('X-Koipond-Degraded')).toBe('upstream')
+    expect(response.headers.get('X-Koipond-Snapshot')).toBe('edge')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(response.headers.get('Access-Control-Expose-Headers')).toContain('X-Koipond-Cache')
     const body = await response.json<{
@@ -126,6 +132,48 @@ describe('privacy-preserving contribution worker', () => {
     }>()
     expect(body.contributions).toHaveLength(2)
     expect(body.fetchedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('serves the globally shared snapshot after local edge caches are lost', async () => {
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(new Request(input).url)
+      const previousYear = url.searchParams.get('from')?.startsWith('2025')
+      const html = previousYear
+        ? calendarHTML('2025-12-31', 4, '12 contributions on December 31st.')
+        : calendarHTML('2026-01-01', 1, '1 contribution on January 1st.')
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    })
+    const url = 'https://global.example/v1/contributions/Global-User'
+    const first = await exports.default.fetch(url)
+    expect(first.headers.get('X-Koipond-Cache')).toBe('MISS')
+
+    const snapshot = 'contributions:v1:global-user'
+    await vi.waitFor(async () => {
+      expect(await env.CONTRIBUTION_SNAPSHOTS.get(snapshot)).not.toBeNull()
+    })
+    const cache = await caches.open('koi-almanac-contributions-v2')
+    await Promise.all([
+      cache.delete(new Request('https://global.example/v1/contributions/global-user')),
+      cache.delete(new Request('https://global.example/__cache/stale/v1/contributions/global-user')),
+    ])
+    upstream.mockResolvedValue(new Response('temporarily unavailable', { status: 503 }))
+
+    const response = await exports.default.fetch(new Request(url, {
+      headers: { Origin: 'https://pillowtalk-qy.github.io' },
+    }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('X-Koipond-Cache')).toBe('STALE')
+    expect(response.headers.get('X-Koipond-Snapshot')).toBe('global')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('X-Koipond-Snapshot')
+    await expect(response.json()).resolves.toMatchObject({
+      source: 'github.com/public-contribution-calendar',
+      contributions: [
+        { date: '2025-12-31', count: 12, level: 4 },
+        { date: '2026-01-01', count: 1, level: 1 },
+      ],
+    })
+    await env.CONTRIBUTION_SNAPSHOTS.delete(snapshot)
   })
 
   it('does not grant CORS access to unrelated sites', async () => {

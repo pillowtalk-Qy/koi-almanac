@@ -254,6 +254,68 @@
   }
   .phase-jump:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
   .fixed-environment #environment-controls { opacity: 0.42; pointer-events: none; }
+  #environment-scrubbers {
+    flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 18px;
+    padding-top: 2px;
+  }
+  .timeline-field {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px minmax(120px, 1fr) 52px;
+    gap: 9px;
+    align-items: center;
+    color: var(--muted);
+  }
+  .timeline-field output {
+    color: var(--ink);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .timeline-field input[type="range"] {
+    width: 100%;
+    height: 20px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: ew-resize;
+  }
+  .timeline-field input[type="range"]::-webkit-slider-runnable-track {
+    height: 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(227, 244, 251, 0.12);
+    background: var(--timeline-track);
+  }
+  .timeline-field input[type="range"]::-moz-range-track {
+    height: 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(227, 244, 251, 0.12);
+    background: var(--timeline-track);
+  }
+  .timeline-field input[type="range"]::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 2px solid #04222c;
+    border-radius: 50%;
+    background: #e3f4fb;
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45);
+    -webkit-appearance: none;
+  }
+  .timeline-field input[type="range"]::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border: 2px solid #04222c;
+    border-radius: 50%;
+    background: #e3f4fb;
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45);
+  }
+  .timeline-field input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .year-timeline { --timeline-track: linear-gradient(90deg, #6bbf8a 0 25%, #42b7c8 25% 50%, #c88b54 50% 75%, #8cc8da 75% 100%); }
+  .day-timeline { --timeline-track: linear-gradient(90deg, #19354b, #dda85f 25%, #8bd3df 50%, #d17c69 75%, #19354b); }
 
   #pond {
     background: var(--surface);
@@ -343,6 +405,7 @@
     .card { padding: 16px; }
     #download { margin-left: 0; }
     #moment-label { width: 100%; margin-left: 0; }
+    #environment-scrubbers { grid-template-columns: 1fr; }
     #pond { padding: 8px; overflow: hidden; }
     #pond svg { min-width: 0; }
   }
@@ -402,6 +465,16 @@
         <button type="button" class="phase-jump" data-phase="night" data-time="23:00" title="Preview nighttime" aria-label="Preview nighttime">☾</button>
       </div>
       <span id="moment-label" aria-live="polite"></span>
+      <div id="environment-scrubbers">
+        <label class="timeline-field year-timeline">year
+          <input id="year-timeline" type="range" min="1" max="365" step="1" aria-label="Day of year">
+          <output id="year-timeline-value" for="year-timeline"></output>
+        </label>
+        <label class="timeline-field day-timeline">day
+          <input id="day-timeline" type="range" min="0" max="1439" step="1" aria-label="Time of day">
+          <output id="day-timeline-value" for="day-timeline"></output>
+        </label>
+      </div>
     </div>
     <div id="pond"></div>
 

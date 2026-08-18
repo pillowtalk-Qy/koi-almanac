@@ -10,6 +10,8 @@ export function validateExplorer(html: string, javascript: string): void {
   assert(html.includes('<title>Koi Almanac:'), 'Explorer title is missing')
   assert(html.includes('<form id="form">'), 'Explorer form is missing')
   assert(html.includes('<div id="pond"></div>'), 'Explorer pond mount is missing')
+  assert(html.includes('id="year-timeline"'), 'Explorer year timeline is missing')
+  assert(html.includes('id="day-timeline"'), 'Explorer day timeline is missing')
   assert(html.includes('<script src="demo.js" defer></script>'), 'Explorer script reference is missing')
   assert(javascript.length > 50_000, 'Explorer bundle is unexpectedly small')
   assert(
@@ -24,6 +26,7 @@ export function validateHealth(value: unknown): void {
   assert(health.ok === true, 'Worker health is not OK')
   assert(health.source === 'github.com', 'Worker health source changed')
   assert(health.logging === 'disabled', 'Worker no longer declares logging disabled')
+  assert(health.snapshot === 'global-kv', 'Worker global snapshot is not enabled')
 }
 
 export function validateContributions(value: unknown, now = new Date()): number {

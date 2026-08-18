@@ -203,6 +203,7 @@ interface SpringPlantSite {
   rotation: number
   scale: number
   blades: number
+  shoots: number
   kind: 'ribbon' | 'pondweed' | 'fanwort'
 }
 
@@ -307,9 +308,9 @@ export function springWaterPlants(
   const surface = clamp01(surfaceActivity)
   const growth = 0.58 + clamp01(intensity) * 0.42
   const sites: SpringPlantSite[] = [
-    { x: width * 0.14, y: LAYOUT.height - 4, rotation: 0, scale: 1.12, blades: 5, kind: 'ribbon' },
-    { x: width * 0.56, y: LAYOUT.height - 5, rotation: 0, scale: 1.12, blades: 3, kind: 'pondweed' },
-    { x: width * 0.84, y: LAYOUT.height - 4, rotation: 0, scale: 1.16, blades: 3, kind: 'fanwort' },
+    { x: width * 0.12, y: LAYOUT.height - 3, rotation: -1.5, scale: 1.18, blades: 5, shoots: 1, kind: 'ribbon' },
+    { x: width * 0.61, y: LAYOUT.height - 9, rotation: 1.3, scale: 0.92, blades: 3, shoots: 0, kind: 'pondweed' },
+    { x: width * 0.85, y: LAYOUT.height - 4, rotation: -0.8, scale: 1.08, blades: 3, shoots: 1, kind: 'fanwort' },
   ]
   const clusters = sites.map((site, clusterIndex) => {
     const bias = direction * strength * (1.35 + clusterIndex * 0.18)
@@ -317,10 +318,19 @@ export function springWaterPlants(
     const duration = 4.1 + clusterIndex * 0.62 + (1 - strength) * 0.9
     const delay = 1.2 + clusterIndex * 2.7
     let blades = ''
-    for (let bladeIndex = 0; bladeIndex < site.blades; bladeIndex++) {
-      const position = bladeIndex - (site.blades - 1) / 2
+    const bladeOrder = Array.from({ length: site.blades + site.shoots }, (_, index) => index)
+      .sort((a, b) => a % 3 - b % 3)
+    for (const bladeIndex of bladeOrder) {
+      const isShoot = bladeIndex >= site.blades
+      const depthIndex = bladeIndex % 3
+      const depth = (['back', 'middle', 'front'] as const)[depthIndex]
+      const maturePosition = bladeIndex - (site.blades - 1) / 2
+      const shootSide = clusterIndex === 2 ? -1 : 1
+      const position = isShoot ? shootSide * (site.blades * 0.5 + 0.3) : maturePosition
       const offset = position * (5 + site.scale * 0.9) + (r() - 0.5) * 1.5
-      const length = (29 + r() * 15 + (bladeIndex % 2) * 4) * growth * site.scale
+      const depthScale = depth === 'back' ? 0.84 : depth === 'middle' ? 0.94 : 1
+      const maturityScale = isShoot ? 0.54 + r() * 0.08 : 1
+      const length = (29 + r() * 15 + (bladeIndex % 2) * 4) * growth * site.scale * depthScale * maturityScale
       const bladeWidth = 3.8 + r() * 1.8
       const bend = direction * (4.8 + strength * 6.3) + (r() - 0.5) * 6.4
       const angle = position * 7 + (r() - 0.5) * 3.5
@@ -337,6 +347,7 @@ export function springWaterPlants(
         `animation-duration:${f1(tipDuration)}s;animation-delay:-${f1(tipDelay)}s`
       const fill = bladeIndex % 3 === 0 ? theme.plankton[2] : theme.lily
       const opacity = 0.72 + r() * 0.2
+      const layerOpacity = isShoot ? 0.82 : depth === 'back' ? 0.68 : depth === 'middle' ? 0.86 : 1
       const ribbon =
         `<path d="${springBladePath(length, bladeWidth, bend)}" fill="${fill}" opacity="${opacity.toFixed(2)}"/>` +
         `<path d="M0 -1 C0 -${f1(length * 0.34)} ${f1(bend * 0.58)} -${f1(length * 0.72)} ${f1(bend)} -${f1(length * 0.92)}" ` +
@@ -350,7 +361,7 @@ export function springWaterPlants(
         ? ribbon
         : site.kind === 'pondweed'
           ? springPondweedSprig(
-              length * (bladeIndex === 1 ? 1.08 : 0.9),
+              length * (bladeIndex === Math.floor(site.blades / 2) ? 1.08 : 0.9),
               bend * 0.9,
               theme.plankton[2],
               theme.plankton[3],
@@ -359,7 +370,7 @@ export function springWaterPlants(
               tipId,
             )
           : springFanwortSprig(
-              length * (bladeIndex === 1 ? 1.06 : 0.88),
+              length * (bladeIndex === Math.floor(site.blades / 2) ? 1.06 : 0.88),
               bend * 0.82,
               theme.plankton[2],
               theme.plankton[3],
@@ -368,7 +379,8 @@ export function springWaterPlants(
               tipId,
             )
       blades +=
-        `<g transform="translate(${f1(offset)} 0) rotate(${f1(angle)})">` +
+        `<g data-spring-depth="${depth}" data-spring-maturity="${isShoot ? 'shoot' : 'mature'}" ` +
+        `opacity="${f1(layerOpacity)}" transform="translate(${f1(offset)} 0) rotate(${f1(angle)})">` +
         `<g class="spring-blade" style="--blade-r0:${f1(-direction * bladeSwing * 0.45)}deg;` +
         `--blade-r1:${f1(direction * bladeSwing)}deg;animation-duration:${f1(bladeDuration)}s;animation-delay:-${f1(bladeDelay)}s">` +
         bladeArtwork +
@@ -376,6 +388,10 @@ export function springWaterPlants(
     }
     return (
       `<g data-spring-cluster="${clusterIndex}" data-spring-kind="${site.kind}" transform="translate(${f1(site.x)} ${f1(site.y)}) rotate(${site.rotation})">` +
+      `<path data-spring-substrate="${clusterIndex}" d="M-${f1(16 * site.scale)} 2.6 ` +
+      `Q-${f1(8 * site.scale)} -3.2 ${f1(1.5 * site.scale)} -1.5 Q${f1(10 * site.scale)} -2.8 ${f1(17 * site.scale)} 2.4 ` +
+      `Q${f1(4 * site.scale)} ${f1(6.2 * site.scale)} -${f1(16 * site.scale)} 2.6 Z" ` +
+      `fill="${theme.pebbles[0]}" opacity="0.48"/>` +
       `<ellipse cx="1.8" cy="2.4" rx="${f1(15 * site.scale)}" ry="${f1(3.7 * site.scale)}" fill="rgba(0,20,25,0.17)"/>` +
       `<circle cx="-${f1(7.2 * site.scale)}" cy="1.2" r="${f1(2.2 * site.scale)}" fill="${theme.pebbles[1]}" opacity="0.78"/>` +
       `<circle cx="${f1(7.8 * site.scale)}" cy="1.5" r="${f1(2.7 * site.scale)}" fill="${theme.pebbles[2]}" opacity="0.72"/>` +
@@ -386,6 +402,9 @@ export function springWaterPlants(
       `</g>` +
       `<path d="M-${f1(10 * site.scale)} 1.4 Q0 -2.8 ${f1(10 * site.scale)} 1.4 Q0 4.2 -${f1(10 * site.scale)} 1.4 Z" ` +
       `data-spring-root="${clusterIndex}" fill="${theme.plankton[1]}" opacity="0.76"/>` +
+      `<path data-spring-foreground="${clusterIndex}" d="M-${f1(12 * site.scale)} 2.6 ` +
+      `Q-${f1(4 * site.scale)} 0.8 ${f1(2 * site.scale)} 2.1 Q${f1(8 * site.scale)} 0.6 ${f1(13 * site.scale)} 3.1" ` +
+      `fill="none" stroke="${theme.pebbles[2]}" stroke-width="${f1(1.5 * site.scale)}" stroke-linecap="round" opacity="0.62"/>` +
       `</g>`
     )
   }).join('')

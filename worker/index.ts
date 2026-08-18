@@ -8,6 +8,7 @@ const LOCAL_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/
 
 type ContributionLevel = 0 | 1 | 2 | 3 | 4
 type CacheStatus = 'HIT' | 'MISS' | 'STALE'
+type StaleSource = 'edge' | 'global'
 
 interface ContributionDay {
   date: string
@@ -18,6 +19,12 @@ interface ContributionDay {
 interface CalendarRange {
   from: string
   to: string
+}
+
+interface ContributionPayload {
+  contributions: ContributionDay[]
+  source: 'github.com/public-contribution-calendar'
+  fetchedAt: string
 }
 
 class HTTPError extends Error {
@@ -171,7 +178,7 @@ function allowedOrigin(request: Request, env: Env): string | null | undefined {
   return undefined
 }
 
-function responseHeaders(origin: string | null, cacheStatus?: CacheStatus): Headers {
+function responseHeaders(origin: string | null, cacheStatus?: CacheStatus, staleSource?: StaleSource): Headers {
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
     'Referrer-Policy': 'no-referrer',
@@ -181,13 +188,17 @@ function responseHeaders(origin: string | null, cacheStatus?: CacheStatus): Head
     headers.set('Access-Control-Allow-Origin', origin)
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
     headers.set('Access-Control-Allow-Headers', 'Content-Type')
-    headers.set('Access-Control-Expose-Headers', 'X-Koipond-Cache, X-Koipond-Degraded, X-Koipond-Fetched-At')
+    headers.set(
+      'Access-Control-Expose-Headers',
+      'X-Koipond-Cache, X-Koipond-Degraded, X-Koipond-Fetched-At, X-Koipond-Snapshot',
+    )
     headers.set('Access-Control-Max-Age', '86400')
     headers.set('Vary', 'Origin')
   }
   if (cacheStatus) headers.set('X-Koipond-Cache', cacheStatus)
   if (cacheStatus === 'STALE') {
     headers.set('X-Koipond-Degraded', 'upstream')
+    if (staleSource) headers.set('X-Koipond-Snapshot', staleSource)
     headers.set('Warning', '110 - "Response is stale while GitHub recovers"')
   }
   return headers
@@ -205,12 +216,62 @@ function jsonResponse(
   })
 }
 
-function withRequestHeaders(response: Response, origin: string | null, cacheStatus: CacheStatus): Response {
+function withRequestHeaders(
+  response: Response,
+  origin: string | null,
+  cacheStatus: CacheStatus,
+  staleSource?: StaleSource,
+): Response {
   const headers = new Headers(response.headers)
-  const requestHeaders = responseHeaders(origin, cacheStatus)
+  const requestHeaders = responseHeaders(origin, cacheStatus, staleSource)
   for (const [name, value] of requestHeaders) headers.set(name, value)
   if (cacheStatus === 'STALE') headers.set('Cache-Control', 'no-store')
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
+function isContributionPayload(value: unknown): value is ContributionPayload {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const payload = value as Record<string, unknown>
+  if (
+    payload.source !== 'github.com/public-contribution-calendar' ||
+    typeof payload.fetchedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T/.test(payload.fetchedAt) ||
+    !Array.isArray(payload.contributions) ||
+    payload.contributions.length === 0
+  ) return false
+
+  return payload.contributions.every(day => {
+    if (day === null || typeof day !== 'object' || Array.isArray(day)) return false
+    const entry = day as Record<string, unknown>
+    return typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) &&
+      Number.isInteger(entry.count) && Number(entry.count) >= 0 &&
+      Number.isInteger(entry.level) && Number(entry.level) >= 0 && Number(entry.level) <= 4
+  })
+}
+
+function snapshotKey(canonicalUser: string): string {
+  return `contributions:v1:${canonicalUser}`
+}
+
+async function globalSnapshotResponse(
+  env: Env,
+  canonicalUser: string,
+  origin: string | null,
+): Promise<Response | null> {
+  let payload: unknown
+  try {
+    payload = await env.CONTRIBUTION_SNAPSHOTS.get<unknown>(snapshotKey(canonicalUser), {
+      type: 'json',
+      cacheTtl: 60,
+    })
+  } catch {
+    return null
+  }
+  if (!isContributionPayload(payload)) return null
+
+  const response = jsonResponse(payload, 200, null)
+  response.headers.set('X-Koipond-Fetched-At', payload.fetchedAt)
+  return withRequestHeaders(response, origin, 'STALE', 'global')
 }
 
 function contributionCacheKeys(request: Request, canonicalUser: string) {
@@ -241,24 +302,29 @@ async function contributionResponse(
 
   const rateLimit = await env.CONTRIBUTION_RATE_LIMIT.limit({ key: 'github-contribution-calendar' })
   if (!rateLimit.success) {
-    return stale
-      ? withRequestHeaders(stale, origin, 'STALE')
-      : jsonResponse({ error: 'Contribution service is busy; retry shortly' }, 429, origin)
+    if (stale) return withRequestHeaders(stale, origin, 'STALE', 'edge')
+    return await globalSnapshotResponse(env, canonicalUser, origin) ??
+      jsonResponse({ error: 'Contribution service is busy; retry shortly' }, 429, origin)
   }
 
   let contributions: ContributionDay[]
   try {
     contributions = await fetchContributions(username)
   } catch (error) {
-    if (stale && transientFailure(error)) return withRequestHeaders(stale, origin, 'STALE')
+    if (transientFailure(error)) {
+      if (stale) return withRequestHeaders(stale, origin, 'STALE', 'edge')
+      const globalSnapshot = await globalSnapshotResponse(env, canonicalUser, origin)
+      if (globalSnapshot) return globalSnapshot
+    }
     throw error
   }
   const fetchedAt = new Date().toISOString()
-  const response = jsonResponse(
-    { contributions, source: 'github.com/public-contribution-calendar', fetchedAt },
-    200,
-    null,
-  )
+  const payload: ContributionPayload = {
+    contributions,
+    source: 'github.com/public-contribution-calendar',
+    fetchedAt,
+  }
+  const response = jsonResponse(payload, 200, null)
   response.headers.set('X-Koipond-Fetched-At', fetchedAt)
   response.headers.set('Cache-Control', `public, max-age=300, s-maxage=${CACHE_TTL_SECONDS}`)
   const staleResponse = response.clone()
@@ -266,6 +332,9 @@ async function contributionResponse(
   ctx.waitUntil(Promise.all([
     cache.put(cacheKeys.fresh, response.clone()),
     cache.put(cacheKeys.stale, staleResponse),
+    env.CONTRIBUTION_SNAPSHOTS.put(snapshotKey(canonicalUser), JSON.stringify(payload), {
+      expirationTtl: STALE_CACHE_TTL_SECONDS,
+    }),
   ]))
   return withRequestHeaders(response, origin, 'MISS')
 }
@@ -282,7 +351,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
   if (request.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405, origin)
 
   if (url.pathname === '/health') {
-    return jsonResponse({ ok: true, source: 'github.com', logging: 'disabled' }, 200, origin)
+    return jsonResponse({ ok: true, source: 'github.com', logging: 'disabled', snapshot: 'global-kv' }, 200, origin)
   }
 
   const match = url.pathname.match(/^\/v1\/contributions\/([^/]+)$/)

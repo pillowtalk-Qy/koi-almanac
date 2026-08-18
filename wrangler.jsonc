@@ -19,6 +19,11 @@
       }
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CONTRIBUTION_SNAPSHOTS"
+    }
+  ],
   "observability": {
     "enabled": false
   }

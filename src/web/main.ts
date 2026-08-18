@@ -25,6 +25,10 @@ const live = $<HTMLInputElement>('live')
 const date = $<HTMLInputElement>('date')
 const time = $<HTMLInputElement>('time')
 const momentLabel = $<HTMLSpanElement>('moment-label')
+const yearTimeline = $<HTMLInputElement>('year-timeline')
+const dayTimeline = $<HTMLInputElement>('day-timeline')
+const yearTimelineValue = $<HTMLOutputElement>('year-timeline-value')
+const dayTimelineValue = $<HTMLOutputElement>('day-timeline-value')
 
 const workflowFor = () => `name: koi-almanac
 on:
@@ -124,8 +128,45 @@ let currentPlan: Plan | null = null
 let currentUser = ''
 let pondSwapTimer: number | undefined
 let pondTransitionRevision = 0
+let environmentFrame: number | undefined
 
 const pad = (value: number) => String(value).padStart(2, '0')
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
+const monthDayFormatter = new Intl.DateTimeFormat('en', {
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+
+function daysInYear(year: number): number {
+  return Math.round((Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / DAY_MILLISECONDS)
+}
+
+function selectedDate(): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) return null
+  const selected = new Date(`${date.value}T00:00:00Z`)
+  return Number.isNaN(selected.getTime()) ? null : selected
+}
+
+function syncEnvironmentTimelines() {
+  const selected = selectedDate()
+  if (selected) {
+    const year = selected.getUTCFullYear()
+    const dayOfYear = Math.floor((selected.getTime() - Date.UTC(year, 0, 1)) / DAY_MILLISECONDS) + 1
+    yearTimeline.max = String(daysInYear(year))
+    yearTimeline.value = String(dayOfYear)
+    yearTimelineValue.textContent = monthDayFormatter.format(selected)
+    yearTimeline.setAttribute('aria-valuetext', `${yearTimelineValue.textContent}, ${year}`)
+  }
+
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(time.value)
+  if (timeMatch) {
+    const minute = Number(timeMatch[1]) * 60 + Number(timeMatch[2])
+    dayTimeline.value = String(minute)
+    dayTimelineValue.textContent = time.value
+    dayTimeline.setAttribute('aria-valuetext', time.value)
+  }
+}
 
 function syncURL() {
   const params = new URLSearchParams()
@@ -142,6 +183,7 @@ function updateLiveInputs() {
   const moment = momentAtTimezone(new Date())
   date.value = `${moment.year}-${pad(moment.month)}-${pad(moment.day)}`
   time.value = `${pad(Math.floor(moment.minuteOfDay / 60))}:${pad(moment.minuteOfDay % 60)}`
+  syncEnvironmentTimelines()
 }
 
 function selectedEnvironment(): PondEnvironment {
@@ -151,6 +193,7 @@ function selectedEnvironment(): PondEnvironment {
 function renderAuto() {
   if (!currentGrid || !currentPlan) return
   if (live.checked) updateLiveInputs()
+  else syncEnvironmentTimelines()
   const environment = selectedEnvironment()
   const environmentPlan = plan(currentGrid, currentUser, undefined, environment)
   svgs.auto = renderSVG(
@@ -168,6 +211,15 @@ function renderAuto() {
   for (const button of document.querySelectorAll<HTMLButtonElement>('.phase-jump')) {
     button.classList.toggle('on', button.dataset.phase === environment.phase)
   }
+}
+
+function scheduleEnvironmentPreview() {
+  if (environmentFrame !== undefined) return
+  environmentFrame = window.requestAnimationFrame(() => {
+    environmentFrame = undefined
+    if (active === 'auto') show('auto')
+    syncURL()
+  })
 }
 
 function mountPond(mode: ViewMode) {
@@ -283,16 +335,36 @@ live.addEventListener('change', () => {
 for (const control of [date, time]) {
   control.addEventListener('input', () => {
     live.checked = false
+    syncEnvironmentTimelines()
     if (active === 'auto') show('auto', true)
     syncURL()
   })
 }
+
+yearTimeline.addEventListener('input', () => {
+  const selected = selectedDate()
+  const year = selected?.getUTCFullYear() ?? momentAtTimezone(new Date()).year
+  const dayOfYear = Math.max(1, Math.min(daysInYear(year), Number(yearTimeline.value)))
+  date.value = new Date(Date.UTC(year, 0, dayOfYear)).toISOString().slice(0, 10)
+  live.checked = false
+  syncEnvironmentTimelines()
+  scheduleEnvironmentPreview()
+})
+
+dayTimeline.addEventListener('input', () => {
+  const minute = Math.max(0, Math.min(1_439, Number(dayTimeline.value)))
+  time.value = `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`
+  live.checked = false
+  syncEnvironmentTimelines()
+  scheduleEnvironmentPreview()
+})
 
 document.querySelectorAll<HTMLButtonElement>('.season-jump').forEach(button => {
   button.addEventListener('click', () => {
     const year = date.value.slice(0, 4) || String(momentAtTimezone(new Date()).year)
     date.value = `${year}-${button.dataset.monthDay}`
     live.checked = false
+    syncEnvironmentTimelines()
     show('auto', true)
     syncURL()
   })
@@ -302,6 +374,7 @@ document.querySelectorAll<HTMLButtonElement>('.phase-jump').forEach(button => {
   button.addEventListener('click', () => {
     time.value = button.dataset.time ?? time.value
     live.checked = false
+    syncEnvironmentTimelines()
     show('auto', true)
     syncURL()
   })
@@ -324,6 +397,7 @@ const presetTime = initialParams.get('time')
 if (presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate)) date.value = presetDate
 if (presetTime && /^\d{2}:\d{2}$/.test(presetTime)) time.value = presetTime
 if (presetDate || presetTime) live.checked = false
+syncEnvironmentTimelines()
 setInterval(() => {
   if (live.checked && active === 'auto' && currentGrid) show('auto')
 }, 60_000)

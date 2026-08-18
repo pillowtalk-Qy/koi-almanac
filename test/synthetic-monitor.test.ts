@@ -17,7 +17,7 @@ const generator = {
 
 describe('synthetic production monitor contracts', () => {
   it('validates the privacy health declaration and a fresh public calendar', () => {
-    validateHealth({ ok: true, source: 'github.com', logging: 'disabled' })
+    validateHealth({ ok: true, source: 'github.com', logging: 'disabled', snapshot: 'global-kv' })
     expect(() => validateHealth({ ok: true, source: 'github.com', logging: 'enabled' })).toThrow(/logging/)
 
     const now = new Date('2026-08-17T12:00:00Z')
@@ -46,7 +46,8 @@ describe('synthetic production monitor contracts', () => {
   })
 
   it('detects an incomplete explorer deployment', () => {
-    const html = '<title>Koi Almanac:</title><form id="form"><div id="pond"></div><script src="demo.js" defer></script>'
+    const html = '<title>Koi Almanac:</title><form id="form"><input id="year-timeline"><input id="day-timeline">' +
+      '<div id="pond"></div><script src="demo.js" defer></script>'
     const javascript = `koi-almanac-contributions.intentflow-inspector.workers.dev${' '.repeat(50_000)}`
     validateExplorer(html, javascript)
     expect(() => validateExplorer(html, 'small')).toThrow(/small/)

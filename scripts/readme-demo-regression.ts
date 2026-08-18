@@ -238,13 +238,13 @@ try {
 
   const motionTime = (3 * slotSeconds + slotSeconds / 2) * 1000
   await page.evaluate(ms => document.getAnimations().forEach(animation => (animation.currentTime = ms)), motionTime)
-  const fishSelector = '.rd3-f0'
+  const fishSelector = '.readme-demo-scene-3 .f0'
   const transformBefore = await page.$eval(fishSelector, element => getComputedStyle(element).transform)
   const before = await page.screenshot({ type: 'png', omitBackground: true }) as Buffer
   await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       const name = 'animationName' in animation ? String(animation.animationName) : ''
-      if (name.startsWith('rd3-') && !name.startsWith('rd3-readme-demo-scene')) animation.play()
+      if (name.startsWith('fp')) animation.play()
     }
   })
   await delay(650)
