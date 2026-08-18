@@ -88,8 +88,8 @@ in [`worker/`](worker/), and the production health
 endpoint is [`koi-almanac-contributions.intentflow-inspector.workers.dev/health`](https://koi-almanac-contributions.intentflow-inspector.workers.dev/health).
 
 The explorer opens on the visitor's browser-local clock, with an explicit switch back to the canonical
-Hong Kong view. Local time-zone detection stays inside the browser. An optional `local environment`
-control asks for browser location permission before applying the visitor's latitude and longitude to
+Hong Kong view. Local time-zone detection stays inside the browser. A separate `use location`
+control refines sunlight and seasons by asking for browser permission before applying the visitor's latitude and longitude to
 solar time and hemisphere-aware seasons; those coordinates remain in the page and are never sent to
 the contribution Worker. The Profile SVG itself remains one shared, verifiable Hong Kong snapshot for
 every visitor because GitHub README images cannot execute viewer-specific JavaScript.

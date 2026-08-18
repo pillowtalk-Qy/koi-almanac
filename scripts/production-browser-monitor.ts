@@ -81,7 +81,6 @@ async function checkExplorer(page: Page, scenario: typeof scenarios[number]) {
     document.getElementById('moment-label')?.textContent?.includes(expectedTimezone), {}, scenario.timezone)
 
   await page.click('#local-environment')
-  await page.waitForFunction(() => document.getElementById('location-status')?.textContent === 'location on')
   await page.waitForFunction((expectedLatitude: number) => {
     const metadata = document.querySelector('#pond metadata#koipond-environment')?.textContent
     if (!metadata) return false

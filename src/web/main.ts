@@ -279,9 +279,9 @@ function syncTimeBasisControls() {
     control.setAttribute('aria-pressed', String(selected))
   }
   localEnvironment.disabled = timeBasis !== 'local'
-  locationStatus.textContent = timeBasis === 'hong-kong'
-    ? ''
-    : localCoordinates ? 'location on' : 'clock only'
+  if (timeBasis !== 'local' || !localEnvironment.checked || localCoordinates) {
+    locationStatus.textContent = ''
+  }
 }
 
 function updateLiveInputs() {

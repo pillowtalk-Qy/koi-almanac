@@ -199,6 +199,7 @@
   .live-toggle, .location-toggle { color: var(--accent); cursor: pointer; }
   .live-toggle input, .location-toggle input { accent-color: var(--accent); }
   .location-toggle:has(input:disabled) { color: var(--muted); cursor: default; opacity: 0.52; }
+  .control-dimension { color: var(--muted); }
   #time-basis {
     display: inline-flex;
     gap: 3px;
@@ -453,11 +454,13 @@
     <div id="environment-controls" aria-label="Pond time controls">
       <div class="environment-row">
         <label class="live-toggle"><input id="live" type="checkbox" checked> live</label>
+        <span class="control-dimension">time</span>
         <div id="time-basis" role="group" aria-label="Pond timezone">
-          <button type="button" data-time-basis="local">local</button>
+          <button type="button" data-time-basis="local">my time</button>
           <button type="button" data-time-basis="hong-kong">Hong Kong</button>
         </div>
-        <label class="location-toggle" title="Use this device's location only in this page"><input id="local-environment" type="checkbox"> local environment</label>
+        <span class="control-dimension">sun &amp; seasons</span>
+        <label class="location-toggle" title="Use this device's location only in this page"><input id="local-environment" type="checkbox"> use location</label>
         <span id="location-status" aria-live="polite"></span>
         <a id="download" href="#">↓ download svg</a>
       </div>
