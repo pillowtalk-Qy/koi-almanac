@@ -8,12 +8,14 @@ import {
   validateProfilePresentation,
   validateProfileWorkflow,
   validateProductionArtifacts,
+  validateVerifier,
 } from '../src/synthetic-monitor'
 import type { PondGenerator } from '../src/state'
 
 interface MonitorConfig {
   schemaVersion: number
   explorer: string
+  verifier: string
   worker: string
   syntheticUser: string
   timezoneOffsetMinutes: number
@@ -37,7 +39,7 @@ interface Retrieved {
 const root = process.cwd()
 const config = JSON.parse(readFileSync(resolve(root, 'monitor.json'), 'utf8')) as MonitorConfig
 const release = JSON.parse(readFileSync(resolve(root, 'release.json'), 'utf8')) as ReleaseManifest
-if (config.schemaVersion !== 3 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
+if (config.schemaVersion !== 4 || release.schemaVersion !== 1) throw new Error('Unsupported monitor or release schema')
 
 const wait = (milliseconds: number) => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
 
@@ -82,6 +84,13 @@ const explorer = await retrieve('explorer html', explorerURL.href, 'text/html')
 const bundle = await retrieve('explorer bundle', new URL('demo.js', explorerURL).href, 'text/javascript')
 const renderWorker = await retrieve('explorer render worker', new URL('pond-worker.js', explorerURL).href, 'text/javascript')
 validateExplorer(explorer.body, bundle.body, renderWorker.body)
+const verifierURL = new URL(config.verifier)
+verifierURL.searchParams.set('user', config.syntheticUser)
+const [verifier, verifierBundle] = await Promise.all([
+  retrieve('local verifier html', verifierURL.href, 'text/html'),
+  retrieve('local verifier bundle', new URL('verify.js', verifierURL).href, 'text/javascript'),
+])
+validateVerifier(verifier.body, verifierBundle.body)
 
 const health = await retrieve('worker health', `${config.worker}/health`, 'application/json', {
   origin: explorerURL.origin,
@@ -119,7 +128,7 @@ const [profilePage, profileReadme, profileWorkflow, profileSvg, profileState] = 
   retrieve('profile svg', config.profileSvg, 'image/svg+xml'),
   retrieve('profile state', config.profileState, 'application/json', { maximumBytes: 1_000_000 }),
 ])
-validateProfilePresentation(profilePage.body, profileReadme.body, config.profileSvg, profileExplorer.href)
+validateProfilePresentation(profilePage.body, profileReadme.body, config.profileSvg, profileExplorer.href, verifierURL.href)
 validateProfileWorkflow(profileWorkflow.body)
 validateProfileDelivery(profileSvg.response.headers)
 const state = validateProductionArtifacts(

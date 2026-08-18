@@ -24,3 +24,4 @@ jobs:
           cache: npm
       - run: npm ci --omit=dev
       - run: npm run monitor:production
+      - run: npm run monitor:browser-production

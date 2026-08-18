@@ -1,6 +1,7 @@
 # Koi Almanac 🎏
 
 [![ci](https://github.com/pillowtalk-Qy/koi-almanac/actions/workflows/ci.yml/badge.svg)](https://github.com/pillowtalk-Qy/koi-almanac/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/pillowtalk-Qy/koi-almanac)](https://github.com/pillowtalk-Qy/koi-almanac/releases/latest)
 [![upstream](https://img.shields.io/badge/upstream-0xydev%2Fkoipond-2f81f7?logo=github)](https://github.com/0xydev/koipond)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
@@ -86,8 +87,10 @@ explorer UI. Its source and runtime tests live
 in [`worker/`](worker/), and the production health
 endpoint is [`koi-almanac-contributions.intentflow-inspector.workers.dev/health`](https://koi-almanac-contributions.intentflow-inspector.workers.dev/health).
 
-A daily first-party synthetic monitor checks the explorer, Worker, one fixed public calendar, Profile SVG,
-state hash chain, SVG provenance and released generator SHA. It never samples real visitors, sends no
+A daily first-party synthetic monitor checks the explorer, local verifier, Worker, one fixed public
+calendar, Profile SVG, state hash chain, SVG provenance and released generator SHA. A real Chromium
+pass also opens the production explorer and verifier at desktop and mobile sizes, including reduced
+motion, layout overflow and edge-cache checks. It never samples real visitors, sends no application
 cookies and retains no response bodies. The endpoints and synthetic identity are explicit in
 [`monitor.json`](monitor.json); the monitor runs in GitHub Actions and can also be run with
 `npm run monitor:production`.
@@ -166,7 +169,7 @@ Then embed the generated pond in your README:
   <img alt="Koi Almanac" src="https://raw.githubusercontent.com/<user>/<repo>/output/koi-almanac.svg">
 </a>
 <br>
-<sub>This pond follows Hong Kong time and season. Contributions feed it; its fish remember. · <a href="https://raw.githubusercontent.com/<user>/<repo>/output/pond-state.json">verify state</a></sub>
+<sub>This pond follows Hong Kong time and season. Contributions feed it; its fish remember. · <a href="https://pillowtalk-qy.github.io/koi-almanac/verify.html?user=<user>">verify locally</a></sub>
 ```
 
 Each `outputs` line accepts options as a query string, and can be a `.svg`, `.gif` or `.mp4`:
@@ -198,6 +201,12 @@ outputs: |
 The Action also writes `dist/pond-state.json`. Because the workflow publishes the complete `dist`
 directory to `output`, the next hourly run restores it automatically. The optional Action inputs
 `state_file`, `state_branch` and `state_path` change those locations.
+
+The `verify locally` link opens a browser-only verifier. It retrieves the public state, animated SVG
+and release manifest directly from GitHub, recomputes both SHA-256 digests, and checks that SVG
+provenance and the exact generator commit agree. No state file is uploaded to a verification service.
+The current artifact records its previous digest; because older state files are not published, the UI
+labels that link as recorded rather than claiming the complete history was re-verified.
 
 The workflow reads the published version from `release.json`, validates it, then checks out and executes
 that exact 40-character commit SHA. It follows future Koi Almanac releases automatically without running
@@ -347,6 +356,18 @@ npm run release:check
 Commit the updated manifest as a small follow-up release commit. CI checks its format and verifies that
 the published SHA is an ancestor of the release commit; the production monitor checks that the Profile
 workflow still resolves and executes that SHA.
+
+To prepare an emergency rollback to the previous published generator:
+
+```sh
+npm run release:rollback
+npm run release:check
+```
+
+The rollback command refuses to overwrite an already modified `release.json`, selects the previous
+distinct SHA from its Git history and verifies that commit is an ancestor of `HEAD`. Review the single
+manifest change, commit it and push; Profile workflows follow it automatically. An explicit historical
+target can be selected with `npm run release:rollback -- --to=<40-character-sha>`.
 
 New species, decor, themes and achievement rules are all good first issues: species live in
 `src/render/fish.ts`, decor in `src/render/decor.ts`, colors in `src/render/palette.ts`.

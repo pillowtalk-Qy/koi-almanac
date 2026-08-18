@@ -22,17 +22,30 @@ export function validateExplorer(html: string, javascript: string, workerJavascr
   assert(workerJavascript.includes('koipond-environment'), 'Explorer render Worker has no environment renderer')
 }
 
+export function validateVerifier(html: string, javascript: string): void {
+  assert(html.includes('<title>Verify a Koi Almanac pond</title>'), 'Verifier title is missing')
+  assert(html.includes('<form id="verify-form">'), 'Verifier form is missing')
+  assert(html.includes('<article id="result" hidden>'), 'Verifier result surface is missing')
+  assert(html.includes('<script src="verify.js" defer></script>'), 'Verifier script reference is missing')
+  assert(javascript.length > 5_000, 'Verifier bundle is unexpectedly small')
+  assert(javascript.includes('pond-state.json'), 'Verifier bundle does not retrieve the public state')
+  assert(javascript.includes('SHA-256'), 'Verifier bundle does not use browser SHA-256')
+}
+
 export function validateProfilePresentation(
   profileHtml: string,
   readme: string,
   expectedSvg: string,
   expectedExplorer: string,
+  expectedVerifier: string,
 ): void {
   assert(readme.includes(expectedSvg), 'Profile README does not embed the production pond SVG')
   assert(readme.includes(expectedExplorer), 'Profile README does not link the pond to its explorer')
+  assert(readme.includes(expectedVerifier), 'Profile README does not link to local verification')
   assert(/alt="[^"]*Koi Almanac[^"]*"/.test(readme), 'Profile README pond has no descriptive alt text')
   assert(profileHtml.includes(expectedSvg), 'Rendered GitHub Profile does not contain the production pond SVG')
   assert(profileHtml.includes(expectedExplorer), 'Rendered GitHub Profile pond does not link to its explorer')
+  assert(profileHtml.includes(expectedVerifier.replaceAll('&', '&amp;')), 'Rendered GitHub Profile does not link to local verification')
   assert(/alt="[^"]*Koi Almanac[^"]*"/.test(profileHtml), 'Rendered GitHub Profile lost the pond alt text')
 }
 

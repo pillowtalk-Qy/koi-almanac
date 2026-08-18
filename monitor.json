@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "explorer": "https://pillowtalk-qy.github.io/koi-almanac/",
+  "verifier": "https://pillowtalk-qy.github.io/koi-almanac/verify.html",
   "worker": "https://koi-almanac-contributions.intentflow-inspector.workers.dev",
   "syntheticUser": "pillowtalk-Qy",
   "timezoneOffsetMinutes": 480,

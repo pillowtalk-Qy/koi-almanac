@@ -42,7 +42,7 @@ const snippetFor = (user: string) => `<a href="https://pillowtalk-qy.github.io/k
   <img alt="Koi Almanac" src="https://raw.githubusercontent.com/${user}/${user}/output/koi-almanac.svg">
 </a>
 <br>
-<sub>This pond follows Hong Kong time and season. Contributions feed it; its fish remember. · <a href="https://raw.githubusercontent.com/${user}/${user}/output/pond-state.json">verify state</a></sub>`
+<sub>This pond follows Hong Kong time and season. Contributions feed it; its fish remember. · <a href="https://pillowtalk-qy.github.io/koi-almanac/verify.html?user=${encodeURIComponent(user)}">verify locally</a></sub>`
 
 function fillInstall(user: string) {
   const params = new URLSearchParams({

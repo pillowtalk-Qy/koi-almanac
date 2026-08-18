@@ -9,7 +9,9 @@ reference/
 .readme-demo-regression/
 .boundary-regression/
 .visual-regression/
+.production-browser-monitor/
 site/demo.js
 site/pond-worker.js
+site/verify.js
 .wrangler/
 .dev.vars

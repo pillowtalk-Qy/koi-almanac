@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
 import { cellEnergy, desiredPopulation, ecosystemStats } from './ecology'
 import { rng } from './prng'
+import { canonicalJSON, statePayloadForHash } from './state-canonical'
 import type { FishIdentity, Grid, Plan, Species } from './types'
+
+export { canonicalJSON } from './state-canonical'
 
 export const POND_STATE_VERSION = 2
 const SHA256 = /^[a-f0-9]{64}$/
@@ -62,23 +65,6 @@ const isoDate = (value: unknown): value is string => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
-export function canonicalJSON(value: unknown): string {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value)
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('Cannot hash a non-finite number')
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    return `{${Object.keys(record)
-      .sort()
-      .map(key => `${JSON.stringify(key)}:${canonicalJSON(record[key])}`)
-      .join(',')}}`
-  }
-  throw new Error(`Cannot hash ${typeof value}`)
-}
-
 export const sha256 = (value: unknown): string => createHash('sha256').update(canonicalJSON(value)).digest('hex')
 
 function parseFish(value: unknown): PersistentFish[] | null {
@@ -121,29 +107,10 @@ export function parsePondGenerator(value: unknown): PondGenerator | null {
   return { repository: generator.repository as string, sha: generator.sha as string }
 }
 
-function statePayload(state: PondState): unknown {
-  return {
-    version: state.version,
-    owner: state.owner,
-    seed: state.seed,
-    revision: state.revision,
-    updatedOn: state.updatedOn,
-    fish: state.fish,
-    snapshot: state.snapshot,
-    lastDelta: state.lastDelta,
-    ...(state.generator ? { generator: state.generator } : {}),
-    proof: {
-      algorithm: state.proof.algorithm,
-      sourceDigest: state.proof.sourceDigest,
-      previousDigest: state.proof.previousDigest,
-    },
-  }
-}
-
 export const sourceDigestFor = (owner: string, snapshot: Record<string, number>): string =>
   sha256({ owner, snapshot })
 
-export const stateDigestFor = (state: PondState): string => sha256(statePayload(state))
+export const stateDigestFor = (state: PondState): string => sha256(statePayloadForHash(state))
 
 function signed(state: PondState): PondState {
   const copy: PondState = {

@@ -11,6 +11,7 @@ import {
   validateProfilePresentation,
   validateProfileWorkflow,
   validateProductionArtifacts,
+  validateVerifier,
 } from '../src/synthetic-monitor'
 
 const generator = {
@@ -59,12 +60,21 @@ describe('synthetic production monitor contracts', () => {
     expect(() => validateExplorer(html, 'small', workerJavascript)).toThrow(/small/)
   })
 
+  it('requires a browser-local SHA-256 verifier', () => {
+    const html = '<title>Verify a Koi Almanac pond</title><form id="verify-form">' +
+      '<article id="result" hidden><script src="verify.js" defer></script>'
+    const javascript = `pond-state.json SHA-256${' '.repeat(5_000)}`
+    validateVerifier(html, javascript)
+    expect(() => validateVerifier(html, 'small')).toThrow(/small/)
+  })
+
   it('binds the rendered GitHub profile to a secure cached SVG delivery', () => {
     const svgUrl = 'https://raw.githubusercontent.com/pillowtalk-Qy/pillowtalk-Qy/output/koi-almanac.svg'
     const explorer = 'https://pillowtalk-qy.github.io/koi-almanac/?user=pillowtalk-Qy'
-    const image = `<a href="${explorer}"><img alt="Qy's Koi Almanac" src="${svgUrl}"></a>`
-    validateProfilePresentation(`<main>${image}</main>`, image, svgUrl, explorer)
-    expect(() => validateProfilePresentation('<main></main>', image, svgUrl, explorer)).toThrow(/Rendered/)
+    const verifier = 'https://pillowtalk-qy.github.io/koi-almanac/verify.html?user=pillowtalk-Qy'
+    const image = `<a href="${explorer}"><img alt="Qy's Koi Almanac" src="${svgUrl}"></a><a href="${verifier}">verify locally</a>`
+    validateProfilePresentation(`<main>${image}</main>`, image, svgUrl, explorer, verifier)
+    expect(() => validateProfilePresentation('<main></main>', image, svgUrl, explorer, verifier)).toThrow(/Rendered/)
 
     validateProfileDelivery(new Headers({
       'content-type': 'image/svg+xml',
