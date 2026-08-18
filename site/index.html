@@ -152,21 +152,6 @@
   #result[hidden] { display: none; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-  #tabs { display: flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px; width: max-content; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-  #tabs button {
-    background: transparent;
-    border: 0;
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 18px;
-    border-radius: 999px;
-    box-shadow: none;
-    transition: background 0.18s ease, color 0.18s ease;
-  }
-  #tabs button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
-  #tabs button.on { background: linear-gradient(135deg, #67e8f9, var(--accent)); color: #04222c; }
   #download {
     margin-left: auto;
     color: var(--accent);
@@ -182,19 +167,21 @@
     transition: border-color 0.16s ease, background 0.16s ease;
   }
   #download:hover { border-color: rgba(34, 211, 238, 0.5); background: rgba(34, 211, 238, 0.1); }
-  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .toolbar #tabs { margin: 0; }
   #environment-controls {
-    display: flex;
+    display: grid;
     gap: 9px;
-    align-items: center;
-    flex-wrap: wrap;
     min-height: 36px;
     color: var(--muted);
     font-family: var(--mono);
     font-size: 12px;
   }
-  .env-field, .live-toggle {
+  .environment-row {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .env-field, .live-toggle, .location-toggle {
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -209,8 +196,29 @@
     font: inherit;
     padding: 6px 8px;
   }
-  .live-toggle { color: var(--accent); cursor: pointer; }
-  .live-toggle input { accent-color: var(--accent); }
+  .live-toggle, .location-toggle { color: var(--accent); cursor: pointer; }
+  .live-toggle input, .location-toggle input { accent-color: var(--accent); }
+  .location-toggle:has(input:disabled) { color: var(--muted); cursor: default; opacity: 0.52; }
+  #time-basis {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  #time-basis button {
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    box-shadow: none;
+    color: var(--muted);
+    font: inherit;
+    padding: 4px 10px;
+  }
+  #time-basis button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
+  #time-basis button.on { background: rgba(34, 211, 238, 0.14); color: var(--accent); }
+  #location-status { color: var(--muted); white-space: nowrap; }
   #moment-label { margin-left: auto; color: var(--muted); }
   #season-jumps {
     display: flex;
@@ -253,9 +261,7 @@
     font: 14px/1 var(--sans);
   }
   .phase-jump:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--ink); }
-  .fixed-environment #environment-controls { opacity: 0.42; pointer-events: none; }
   #environment-scrubbers {
-    flex: 1 0 100%;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px 18px;
@@ -404,6 +410,7 @@
     body { padding: 48px 14px 60px; }
     .card { padding: 16px; }
     #download { margin-left: 0; }
+    .environment-row { align-items: flex-start; }
     #moment-label { width: 100%; margin-left: 0; }
     #environment-scrubbers { grid-template-columns: 1fr; }
     #pond { padding: 8px; overflow: hidden; }
@@ -424,7 +431,8 @@
     <h1><span class="koi">🎏</span> <span>Koi Almanac</span></h1>
     <p class="lede">Your GitHub contribution graph as a <b>living koi pond</b>. Commits become plankton,
     fish graze the year clean, a turtle joins for 30+ day streaks and a lotus blooms over quiet
-    stretches. The pond follows Hong Kong daylight and the four seasons. Type a username and watch.</p>
+    stretches. The explorer opens on your local clock; the Profile pond remains anchored to Hong Kong.
+    Type a username and watch.</p>
   </header>
 
   <section class="card">
@@ -442,29 +450,32 @@
   </section>
 
   <div id="result" hidden>
-    <div class="toolbar">
-      <div id="tabs">
-        <button type="button" data-theme="auto">auto</button>
-        <button type="button" data-theme="light">light</button>
-        <button type="button" data-theme="dark">dark</button>
-      </div>
-      <a id="download" href="#">↓ download svg</a>
-    </div>
     <div id="environment-controls" aria-label="Pond time controls">
-      <label class="live-toggle"><input id="live" type="checkbox" checked> live</label>
-      <label class="env-field">date <input id="date" type="date"></label>
-      <label class="env-field">time <input id="time" type="time"></label>
-      <div id="season-jumps" aria-label="Season previews">
-        <button type="button" class="season-jump" data-season="spring" data-month-day="04-15">spring</button>
-        <button type="button" class="season-jump" data-season="summer" data-month-day="07-15">summer</button>
-        <button type="button" class="season-jump" data-season="autumn" data-month-day="10-15">autumn</button>
-        <button type="button" class="season-jump" data-season="winter" data-month-day="01-15">winter</button>
+      <div class="environment-row">
+        <label class="live-toggle"><input id="live" type="checkbox" checked> live</label>
+        <div id="time-basis" role="group" aria-label="Pond timezone">
+          <button type="button" data-time-basis="local">local</button>
+          <button type="button" data-time-basis="hong-kong">Hong Kong</button>
+        </div>
+        <label class="location-toggle" title="Use this device's location only in this page"><input id="local-environment" type="checkbox"> local environment</label>
+        <span id="location-status" aria-live="polite"></span>
+        <a id="download" href="#">↓ download svg</a>
       </div>
-      <div id="phase-jumps" aria-label="Day and night previews">
-        <button type="button" class="phase-jump" data-phase="day" data-time="12:00" title="Preview daytime" aria-label="Preview daytime">☀</button>
-        <button type="button" class="phase-jump" data-phase="night" data-time="23:00" title="Preview nighttime" aria-label="Preview nighttime">☾</button>
+      <div class="environment-row">
+        <label class="env-field">date <input id="date" type="date"></label>
+        <label class="env-field">time <input id="time" type="time"></label>
+        <div id="season-jumps" aria-label="Season previews">
+          <button type="button" class="season-jump" data-season="spring" data-month-day="04-15">spring</button>
+          <button type="button" class="season-jump" data-season="summer" data-month-day="07-15">summer</button>
+          <button type="button" class="season-jump" data-season="autumn" data-month-day="10-15">autumn</button>
+          <button type="button" class="season-jump" data-season="winter" data-month-day="01-15">winter</button>
+        </div>
+        <div id="phase-jumps" aria-label="Day and night previews">
+          <button type="button" class="phase-jump" data-phase="day" data-time="12:00" title="Preview daytime" aria-label="Preview daytime">☀</button>
+          <button type="button" class="phase-jump" data-phase="night" data-time="23:00" title="Preview nighttime" aria-label="Preview nighttime">☾</button>
+        </div>
+        <span id="moment-label" aria-live="polite"></span>
       </div>
-      <span id="moment-label" aria-live="polite"></span>
       <div id="environment-scrubbers">
         <label class="timeline-field year-timeline">year
           <input id="year-timeline" type="range" min="1" max="365" step="1" aria-label="Day of year">

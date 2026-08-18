@@ -12,6 +12,15 @@ import {
   type RenderWorkerResponse,
 } from './render-jobs'
 import { LatestJobQueue, SupersededJobError } from './latest-job-queue'
+import {
+  HONG_KONG,
+  formatUtcOffset,
+  localTimezoneName,
+  localTimezoneOffset,
+  referenceLongitude,
+  type PondCoordinates,
+  type TimeBasis,
+} from './time-context'
 
 const CONTRIBUTION_API = 'https://koi-almanac-contributions.intentflow-inspector.workers.dev'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -22,7 +31,6 @@ const button = $<HTMLButtonElement>('go')
 const status = $<HTMLParagraphElement>('status')
 const result = $<HTMLDivElement>('result')
 const pond = $<HTMLDivElement>('pond')
-const tabs = $<HTMLDivElement>('tabs')
 const download = $<HTMLAnchorElement>('download')
 const installLink = $<HTMLAnchorElement>('install-link')
 const installNote = $<HTMLSpanElement>('install-note')
@@ -37,6 +45,9 @@ const yearTimeline = $<HTMLInputElement>('year-timeline')
 const dayTimeline = $<HTMLInputElement>('day-timeline')
 const yearTimelineValue = $<HTMLOutputElement>('year-timeline-value')
 const dayTimelineValue = $<HTMLOutputElement>('day-timeline-value')
+const timeBasisControl = $<HTMLDivElement>('time-basis')
+const localEnvironment = $<HTMLInputElement>('local-environment')
+const locationStatus = $<HTMLSpanElement>('location-status')
 
 const snippetFor = (user: string) => `<a href="https://pillowtalk-qy.github.io/koi-almanac/?user=${encodeURIComponent(user)}">
   <img alt="Koi Almanac" src="https://raw.githubusercontent.com/${user}/${user}/output/koi-almanac.svg">
@@ -102,10 +113,12 @@ async function fetchGrid(user: string): Promise<GridResponse> {
   }
 }
 
-type ViewMode = 'auto' | 'light' | 'dark'
+type ViewMode = 'auto'
 
-const svgs: Record<ViewMode, string> = { auto: '', light: '', dark: '' }
-let active: ViewMode = 'auto'
+const svgs: Record<ViewMode, string> = { auto: '' }
+let timeBasis: TimeBasis = 'local'
+let localCoordinates: PondCoordinates | null = null
+let locationRequestRevision = 0
 let currentGrid: Grid | null = null
 let currentPlan: Plan | null = null
 let committedAutoPlan: Plan | null = null
@@ -231,6 +244,7 @@ function syncURL() {
   const params = new URLSearchParams()
   const user = currentUser || input.value.trim()
   if (user) params.set('user', user)
+  if (timeBasis === 'hong-kong') params.set('view', 'hong-kong')
   if (!live.checked) {
     params.set('date', date.value)
     params.set('time', time.value)
@@ -238,15 +252,57 @@ function syncURL() {
   history.replaceState(null, '', params.size > 0 ? `?${params}` : location.pathname)
 }
 
+function currentTimezoneOffset() {
+  return timeBasis === 'hong-kong'
+    ? HONG_KONG.timezoneOffsetMinutes
+    : -new Date().getTimezoneOffset()
+}
+
+function selectedTimezoneOffset() {
+  return timeBasis === 'hong-kong'
+    ? HONG_KONG.timezoneOffsetMinutes
+    : localTimezoneOffset(date.value, time.value)
+}
+
+function selectedCoordinates(timezoneOffsetMinutes: number): PondCoordinates {
+  if (timeBasis === 'hong-kong') return HONG_KONG
+  return localCoordinates ?? {
+    latitude: HONG_KONG.latitude,
+    longitude: referenceLongitude(timezoneOffsetMinutes),
+  }
+}
+
+function syncTimeBasisControls() {
+  for (const control of timeBasisControl.querySelectorAll<HTMLButtonElement>('button')) {
+    const selected = control.dataset.timeBasis === timeBasis
+    control.classList.toggle('on', selected)
+    control.setAttribute('aria-pressed', String(selected))
+  }
+  localEnvironment.disabled = timeBasis !== 'local'
+  locationStatus.textContent = timeBasis === 'hong-kong'
+    ? ''
+    : localCoordinates ? 'location on' : 'clock only'
+}
+
 function updateLiveInputs() {
-  const moment = momentAtTimezone(new Date())
+  const offset = currentTimezoneOffset()
+  const coordinates = selectedCoordinates(offset)
+  const moment = momentAtTimezone(new Date(), offset, coordinates.latitude, coordinates.longitude)
   date.value = `${moment.year}-${pad(moment.month)}-${pad(moment.day)}`
   time.value = `${pad(Math.floor(moment.minuteOfDay / 60))}:${pad(moment.minuteOfDay % 60)}`
   syncEnvironmentTimelines()
 }
 
 function selectedEnvironment(): PondEnvironment {
-  return deriveEnvironment(momentFromText(date.value, time.value))
+  const offset = selectedTimezoneOffset()
+  const coordinates = selectedCoordinates(offset)
+  return deriveEnvironment(momentFromText(
+    date.value,
+    time.value,
+    offset,
+    coordinates.latitude,
+    coordinates.longitude,
+  ))
 }
 
 async function renderAuto(preview = false, revision = pondTransitionRevision): Promise<boolean> {
@@ -263,13 +319,16 @@ async function renderAuto(preview = false, revision = pondTransitionRevision): P
     environment,
     plan: preview && committedAutoPlan ? committedAutoPlan : undefined,
   })
-  if (revision !== pondTransitionRevision || grid !== currentGrid || user !== currentUser || active !== 'auto') {
+  if (revision !== pondTransitionRevision || grid !== currentGrid || user !== currentUser) {
     return false
   }
   if (!preview) committedAutoPlan = rendered.plan
   svgs.auto = rendered.svg
   const clock = `${pad(Math.floor(environment.minuteOfDay / 60))}:${pad(environment.minuteOfDay % 60)}`
-  momentLabel.textContent = `${environment.date} · ${clock} HKT · ${environment.season} · ${environment.phase}`
+  const zone = timeBasis === 'hong-kong'
+    ? 'Hong Kong · UTC+08:00'
+    : `${localTimezoneName()} · ${formatUtcOffset(environment.timezoneOffsetMinutes)}`
+  momentLabel.textContent = `${environment.date} · ${clock} · ${zone} · ${environment.season} · ${environment.phase}`
   for (const button of document.querySelectorAll<HTMLButtonElement>('.season-jump')) {
     button.classList.toggle('on', button.dataset.season === environment.season)
   }
@@ -287,7 +346,7 @@ function scheduleEnvironmentPreview() {
     environmentFrame = window.requestAnimationFrame(() => {
       environmentFrame = undefined
       lastEnvironmentPreview = performance.now()
-      if (active === 'auto') showPond('auto', false, true)
+      showPond('auto', false, true)
       syncURL()
     })
   }, wait)
@@ -303,7 +362,7 @@ function finishEnvironmentPreview() {
     environmentFrame = undefined
   }
   lastEnvironmentPreview = performance.now()
-  if (active === 'auto') showPond('auto', true)
+  showPond('auto', true)
   syncURL()
 }
 
@@ -352,15 +411,10 @@ function mountPond(mode: ViewMode) {
 
 async function show(mode: ViewMode, animate = false, preview = false): Promise<void> {
   const revision = ++pondTransitionRevision
-  active = mode
   if (pondSwapTimer !== undefined) window.clearTimeout(pondSwapTimer)
   pond.classList.remove('pond-leaving', 'pond-entering')
-  for (const b of tabs.querySelectorAll('button')) {
-    b.classList.toggle('on', b.dataset.theme === mode)
-  }
-  document.body.classList.toggle('fixed-environment', mode !== 'auto')
-  if (mode === 'auto' && !(await renderAuto(preview, revision))) return
-  if (revision !== pondTransitionRevision || active !== mode) return
+  if (!(await renderAuto(preview, revision))) return
+  if (revision !== pondTransitionRevision) return
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const shouldTransition = animate && Boolean(pond.querySelector('svg')) && !reduceMotion
@@ -411,8 +465,6 @@ async function generate(user: string) {
     currentPlan = rendered.plan
     committedAutoPlan = null
     currentUser = user
-    svgs.light = rendered.light
-    svgs.dark = rendered.dark
     if (stale) {
       const snapshot = fetchedAt ? ` from ${new Date(fetchedAt).toLocaleString()}` : ''
       status.dataset.tone = 'warning'
@@ -422,7 +474,7 @@ async function generate(user: string) {
       status.textContent = ''
     }
     result.hidden = false
-    await show(active)
+    await show('auto')
     fillInstall(user)
     syncURL()
   } catch (err) {
@@ -450,14 +502,9 @@ document.querySelectorAll<HTMLButtonElement>('.chip').forEach(chip => {
   })
 })
 
-tabs.addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest('button')
-  if (b?.dataset.theme) showPond(b.dataset.theme as ViewMode, true)
-})
-
 live.addEventListener('change', () => {
   if (live.checked) updateLiveInputs()
-  if (active === 'auto') showPond('auto', true)
+  showPond('auto', true)
   syncURL()
 })
 
@@ -465,7 +512,7 @@ for (const control of [date, time]) {
   control.addEventListener('input', () => {
     live.checked = false
     syncEnvironmentTimelines()
-    if (active === 'auto') showPond('auto', true)
+    showPond('auto', true)
     syncURL()
   })
 }
@@ -478,6 +525,48 @@ yearTimeline.addEventListener('input', () => {
   live.checked = false
   syncEnvironmentTimelines()
   scheduleEnvironmentPreview()
+})
+
+timeBasisControl.addEventListener('click', event => {
+  const control = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-time-basis]')
+  const next = control?.dataset.timeBasis as TimeBasis | undefined
+  if (!next || next === timeBasis) return
+  timeBasis = next
+  syncTimeBasisControls()
+  if (live.checked) updateLiveInputs()
+  showPond('auto', true)
+  syncURL()
+})
+
+localEnvironment.addEventListener('change', () => {
+  const requestRevision = ++locationRequestRevision
+  if (!localEnvironment.checked) {
+    localCoordinates = null
+    syncTimeBasisControls()
+    showPond('auto', true)
+    return
+  }
+  if (!navigator.geolocation) {
+    localEnvironment.checked = false
+    locationStatus.textContent = 'location unavailable'
+    return
+  }
+  locationStatus.textContent = 'requesting location…'
+  navigator.geolocation.getCurrentPosition(position => {
+    if (requestRevision !== locationRequestRevision || !localEnvironment.checked) return
+    localCoordinates = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    }
+    syncTimeBasisControls()
+    showPond('auto', true)
+  }, () => {
+    if (requestRevision !== locationRequestRevision) return
+    localEnvironment.checked = false
+    localCoordinates = null
+    syncTimeBasisControls()
+    locationStatus.textContent = 'location not shared'
+  }, { enableHighAccuracy: false, timeout: 8_000, maximumAge: 3_600_000 })
 })
 
 dayTimeline.addEventListener('input', () => {
@@ -525,6 +614,8 @@ copy.addEventListener('click', () => {
 
 const initialParams = new URLSearchParams(location.search)
 const preset = initialParams.get('user')
+timeBasis = initialParams.get('view') === 'hong-kong' ? 'hong-kong' : 'local'
+syncTimeBasisControls()
 updateLiveInputs()
 const presetDate = initialParams.get('date')
 const presetTime = initialParams.get('time')
@@ -533,7 +624,7 @@ if (presetTime && /^\d{2}:\d{2}$/.test(presetTime)) time.value = presetTime
 if (presetDate || presetTime) live.checked = false
 syncEnvironmentTimelines()
 setInterval(() => {
-  if (live.checked && active === 'auto' && currentGrid) showPond('auto')
+  if (live.checked && currentGrid) showPond('auto')
 }, 60_000)
 if (preset) {
   input.value = preset

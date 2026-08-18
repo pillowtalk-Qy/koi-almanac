@@ -7,8 +7,14 @@ const explorer = process.env.KOIPOND_EXPLORER_URL ?? 'https://pillowtalk-qy.gith
 const user = 'pillowtalk-Qy'
 const output = resolve('.production-browser-monitor')
 const scenarios = [
-  { name: 'desktop', width: 1440, height: 900, reducedMotion: false },
-  { name: 'mobile', width: 390, height: 844, reducedMotion: true },
+  {
+    name: 'desktop', width: 1440, height: 900, reducedMotion: false,
+    timezone: 'America/New_York', latitude: 40.7128, longitude: -74.006,
+  },
+  {
+    name: 'mobile', width: 390, height: 844, reducedMotion: true,
+    timezone: 'Australia/Sydney', latitude: -33.8688, longitude: 151.2093,
+  },
 ] as const
 
 const assert = (condition: unknown, message: string): asserts condition => {
@@ -55,6 +61,37 @@ async function checkExplorer(page: Page, scenario: typeof scenarios[number]) {
   assert(layout.clippedControls.length === 0, `${scenario.name} clips controls: ${layout.clippedControls.join(', ')}`)
   assert(!/unavailable|failed|error/i.test(layout.status), `${scenario.name} explorer reports an error: ${layout.status}`)
   assert(['HIT', 'MISS', 'STALE'].includes(cacheStatus), `${scenario.name} contribution cache status is missing`)
+  const localState = await page.evaluate((expectedTimezone: string) => ({
+    label: document.getElementById('moment-label')?.textContent ?? '',
+    localPressed: document.querySelector('[data-time-basis="local"]')?.getAttribute('aria-pressed'),
+    locationEnabled: !(document.getElementById('local-environment') as HTMLInputElement)?.disabled,
+    legacyThemes: document.querySelectorAll('#tabs, [data-theme]').length,
+    expectedTimezone,
+  }), scenario.timezone)
+  assert(localState.localPressed === 'true', `${scenario.name} explorer does not default to local time`)
+  assert(localState.label.includes(localState.expectedTimezone), `${scenario.name} explorer ignores the browser timezone`)
+  assert(localState.locationEnabled, `${scenario.name} local environment control is unavailable`)
+  assert(localState.legacyThemes === 0, `${scenario.name} explorer still exposes redundant light/dark controls`)
+
+  await page.click('[data-time-basis="hong-kong"]')
+  await page.waitForFunction(() => document.getElementById('moment-label')?.textContent?.includes('Hong Kong'))
+  assert(new URL(page.url()).searchParams.get('view') === 'hong-kong', `${scenario.name} Hong Kong view is not shareable`)
+  await page.click('[data-time-basis="local"]')
+  await page.waitForFunction((expectedTimezone: string) =>
+    document.getElementById('moment-label')?.textContent?.includes(expectedTimezone), {}, scenario.timezone)
+
+  await page.click('#local-environment')
+  await page.waitForFunction(() => document.getElementById('location-status')?.textContent === 'location on')
+  await page.waitForFunction((expectedLatitude: number) => {
+    const metadata = document.querySelector('#pond metadata#koipond-environment')?.textContent
+    if (!metadata) return false
+    const environment = JSON.parse(metadata) as { latitude?: number }
+    return Math.abs(Number(environment.latitude) - expectedLatitude) < 0.01
+  }, {}, scenario.latitude)
+  const localEnvironment = await page.$eval('#pond metadata#koipond-environment', element =>
+    JSON.parse(element.textContent ?? '{}') as { latitude?: number; longitude?: number })
+  assert(Math.abs(Number(localEnvironment.latitude) - scenario.latitude) < 0.01, `${scenario.name} latitude was not applied`)
+  assert(Math.abs(Number(localEnvironment.longitude) - scenario.longitude) < 0.01, `${scenario.name} longitude was not applied`)
   await page.screenshot({ path: resolve(output, `explorer-${scenario.name}.png`), fullPage: true })
   return cacheStatus
 }
@@ -97,6 +134,9 @@ try {
   for (const scenario of scenarios) {
     const page = await browser.newPage()
     await page.setViewport({ width: scenario.width, height: scenario.height, deviceScaleFactor: 1 })
+    await page.emulateTimezone(scenario.timezone)
+    await browser.defaultBrowserContext().overridePermissions(new URL(explorer).origin, ['geolocation'])
+    await page.setGeolocation({ latitude: scenario.latitude, longitude: scenario.longitude })
     await page.emulateMediaFeatures([
       { name: 'prefers-reduced-motion', value: scenario.reducedMotion ? 'reduce' : 'no-preference' },
       { name: 'prefers-color-scheme', value: 'dark' },
