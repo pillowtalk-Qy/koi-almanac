@@ -250,7 +250,7 @@ async function interactionBoundaryRegression(page: Page) {
       }
     })
     await page.goto(
-      `http://127.0.0.1:${address.port}/?user=boundary-test&date=2026-01-15&time=12%3A00`,
+      `http://127.0.0.1:${address.port}/?user=boundary-test&view=hong-kong&date=2026-01-15&time=12%3A00`,
       { waitUntil: 'networkidle0' },
     )
     await page.waitForSelector('#result:not([hidden])')
